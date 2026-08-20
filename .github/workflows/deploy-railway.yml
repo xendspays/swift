@@ -29,4 +29,4 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up --project 1aebfacb-3335-4597-90aa-32fc3d280c1d --service swift --environment production -y --ci
+          railway up --project 1aebfacb-3335-4597-90aa-32fc3d280c1d --service backend --environment production -y --ci
