@@ -65,6 +65,35 @@ def auth_headers(auth_token):
     return {"Authorization": f"Bearer {auth_token}"}
 
 
+async def _set_test_merchant_enabled_methods(*methods: str) -> None:
+    """Configure the shared authenticated merchant for a payment test."""
+    async for session in get_db():
+        admin = (
+            await session.execute(
+                select(AdminUser).where(AdminUser.telegram_id == "123456789")
+            )
+        ).scalar_one()
+        config = (
+            await session.execute(
+                select(MerchantApiConfig).where(
+                    MerchantApiConfig.organization_id == admin.organization_id
+                )
+            )
+        ).scalar_one_or_none()
+        enabled_methods = ",".join(method.upper() for method in methods)
+        if config:
+            config.enabled_payment_methods = enabled_methods
+        else:
+            session.add(
+                MerchantApiConfig(
+                    organization_id=admin.organization_id,
+                    enabled_payment_methods=enabled_methods,
+                )
+            )
+        await session.commit()
+        return
+
+
 # ---------------------------------------------------------------------------
 # Health endpoints
 # ---------------------------------------------------------------------------
@@ -967,6 +996,7 @@ class TestMagpieTopUpIntegration:
 class TestCheckoutSessionPayloads:
     def test_checkout_session_includes_amount_in_magpie_payload(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("card", "gcash"))
 
         async def fake_create_session(self, *, payload):
             captured.update(payload)
@@ -999,6 +1029,7 @@ class TestCheckoutSessionPayloads:
 
     def test_checkout_session_falls_back_to_checkout_when_session_endpoint_fails(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("card", "gcash"))
 
         async def fake_create_session(self, *, payload):
             return {"success": False, "error": 'Magpie API error (500): {"message": "Internal server error"}'}
@@ -1055,33 +1086,7 @@ class TestSwiftPayEndpointCompatibility:
     def test_xend_payment_endpoints_use_swiftpay_when_configured(self, client, auth_headers, endpoint, expected_type):
         captured: dict = {}
 
-        async def enable_qrph_for_test_merchant():
-            async for session in get_db():
-                admin = (
-                    await session.execute(
-                        select(AdminUser).where(AdminUser.telegram_id == "123456789")
-                    )
-                ).scalar_one()
-                admin.organization_id = "swiftpay-compat-test"
-                config = (
-                    await session.execute(
-                        select(MerchantApiConfig).where(
-                            MerchantApiConfig.organization_id == admin.organization_id
-                        )
-                    )
-                ).scalar_one_or_none()
-                if config:
-                    config.enabled_payment_methods = "QRPH"
-                else:
-                    session.add(
-                        MerchantApiConfig(
-                            organization_id=admin.organization_id,
-                            enabled_payment_methods="QRPH",
-                        )
-                    )
-                await session.commit()
-
-        asyncio.run(enable_qrph_for_test_merchant())
+        asyncio.run(_set_test_merchant_enabled_methods("qrph"))
 
         async def fake_create_order(self, *, amount, reference_no, details=None, currency="PHP", generate_customer_redirect_url=True, institution_code=None):
             captured.update({
@@ -1159,6 +1164,7 @@ class TestXenditCollectionFallback:
 class TestxendDescriptorMerchantPropagation:
     def test_create_invoice_forwards_descriptor_and_merchant_name(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("gcash"))
 
         async def fake_magpie_create_checkout(self, *args, **kwargs):
             captured.update(kwargs)
@@ -1204,6 +1210,7 @@ class TestxendDescriptorMerchantPropagation:
 
     def test_legacy_magpie_create_invoice_route_still_works(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("gcash"))
 
         async def fake_magpie_create_checkout(self, *args, **kwargs):
             captured.update(kwargs)
@@ -1267,6 +1274,7 @@ class TestPaymentApiKeyAuth:
         service_name = f"xend-int-{int(time.time() * 1000)}"
         key_name = f"payment_api_key_int_{int(time.time() * 1000)}"
         api_key_plain = f"xend_live_{int(time.time() * 1000)}_abcdefghijklmnop"
+        asyncio.run(_set_test_merchant_enabled_methods("gcash"))
 
         create_keys = client.post(
             "/api/v1/entities/api_configs/batch",
@@ -1378,12 +1386,16 @@ class TestWalletBalanceConsistency:
             service = WalletsService(session)
             wallet_a = await service.get_or_create_wallet(123456789, "PHP")
             wallet_b = await service.get_or_create_wallet("123456789", "PHP")
+            admin = (
+                await session.execute(
+                    select(AdminUser).where(AdminUser.telegram_id == "123456789")
+                )
+            ).scalar_one()
 
             assert wallet_a.id == wallet_b.id
-            # The seeded admin belongs to an organization, so both user-ID
-            # forms must resolve to that shared organization wallet.
-            assert wallet_a.user_id == "org:swiftpay-ph"
-            assert wallet_a.organization_id == "swiftpay-ph"
+            # Both user-ID forms must resolve to the seeded admin's organization wallet.
+            assert wallet_a.user_id == f"org:{admin.organization_id}"
+            assert wallet_a.organization_id == admin.organization_id
 
 
 class TestEvents:
