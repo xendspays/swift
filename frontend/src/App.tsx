@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -52,8 +52,11 @@ const NDAAgreementPage = React.lazy(() => import('./pages/LegalPages').then((m) 
 
 function AuthAwareContent() {
   const { loading, platformBranding } = useAuth();
+  const { pathname } = useLocation();
+  const publicPaths = ['/', '/home', '/login', '/register', '/sign-up-now', '/pricing', '/collection-rates', '/contact', '/privacy-policy', '/terms-of-service', '/nda', '/maintenance'];
+  const isPublicRoute = publicPaths.includes(pathname) || pathname.startsWith('/checkout/') || pathname.startsWith('/pay/') || pathname.startsWith('/auth/') || pathname === '/logout-callback';
 
-  if (loading) {
+  if (loading && !isPublicRoute) {
     return <AppLoadingScreen logoUrl={platformBranding?.logoUrl} storeName={platformBranding?.name} />;
   }
 
