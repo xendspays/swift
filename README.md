@@ -99,6 +99,18 @@ Use the repo's starter script to run backend and frontend together:
 bash start_app_v2.sh
 ```
 
+### Payment provider setup
+Merchant bank details are used for settlement only. A bank account number cannot create a checkout session, verify a customer payment, or accept QR, wallet, or card payments on its own.
+
+1. Configure approved provider credentials only in the backend environment. Never commit or enter them in the merchant browser UI:
+   - `SWIFTPAY_ACCESS_KEY` and `SWIFTPAY_SECRET_KEY` for configured local payment rails.
+   - `MAGPIE_API_KEY` and `MAGPIE_SECRET_KEY` for configured international wallet rails.
+2. In **Settings > Payment markets**, choose the merchant's operating market, settlement preference, and enabled payment methods.
+3. Check the provider readiness status before enabling a method. Methods are only available at public checkout when both the merchant has enabled them and the platform provider is configured.
+4. Create hosted payment links or use the authenticated checkout API. Link status and expiry are persisted server-side; inactive or expired links cannot be opened publicly.
+
+> Local Alloy runs intentionally start without live provider credentials. They can validate merchant configuration, payment-link lifecycle, and checkout authorization without sending real payments.
+
 For Windows, run:
 
 ```powershell
