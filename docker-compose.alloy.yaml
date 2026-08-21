@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:15-alpine
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paybot
+      POSTGRES_PASSWORD: paybot_dev_password
+      POSTGRES_DB: paybot
+    volumes:
+      - alloy_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U paybot -d paybot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host
+      args:
+        VITE_TURNSTILE_SITE_KEY: ""
+        VITE_TELEGRAM_BOT_USERNAME: ""
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      IS_ALLOY: ${IS_ALLOY:-true}
+      ENVIRONMENT: dev
+      PORT: "8000"
+      DATABASE_URL: postgresql+asyncpg://paybot:paybot_dev_password@127.0.0.1:5432/paybot
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-alloy-local-jwt-secret-change-before-production}
+      ADMIN_USER_ID: alloy-admin
+      ADMIN_USER_EMAIL: admin@alloy.local
+      ADMIN_USER_PASSWORD: ${ADMIN_USER_PASSWORD:-AlloyLocalAdmin123!}
+      INITIALIZE_DEMO_DATA: "1"
+      DISABLE_BACKGROUND_TASKS: "1"
+      PYTHON_BACKEND_URL: http://127.0.0.1:8000
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >-
+      sh -c "python -m alembic upgrade heads &&
+      exec uvicorn main:app --host 0.0.0.0 --port 8000 --log-level info --no-access-log"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import json, urllib.request;
+          data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health'));
+          assert data.get('database') == 'healthy'
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  alloy_postgres_data:
