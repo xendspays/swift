@@ -235,7 +235,6 @@ class TransactionsService(BaseService[Transactions]):
                 wallet.pending_balance = round((wallet.pending_balance or 0.0) - fee_amount, 2)
 
             wallet.balance = round((wallet.balance or 0.0) - fee_amount, 2)
-            wallet.total_fees = (wallet.total_fees or 0.0) + fee_amount
             wallet.updated_at = datetime.now(timezone.utc)
 
             fee_wtxn = Wallet_transactions(
