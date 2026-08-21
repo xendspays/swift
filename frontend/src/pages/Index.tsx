@@ -165,14 +165,12 @@ function SolutionsTabs() {
             <h3 className="text-[22px] font-semibold tracking-tight text-[#1a1a1a]">{tab.heading}</h3>
             <p className="mt-4 text-base leading-7 text-[#535353]">{tab.body}</p>
             {tab.showPaymentMethods && (
-              <div className="mt-6">
-                  <img
-                    src="/static/images/payment-methods-list.webp"
-                  alt="Supported payment methods"
-                  className="max-w-full"
-                  loading="lazy"
-                    onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = 'https://swiftpay.ph/wp-content/themes/SwiftPay/site-assets/images/payment-methods-list.webp'; }}
-                />
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {['QR payments', 'Wallets', 'Local banks', 'Hosted links', 'Checkout API', 'Settlement preferences'].map((method) => (
+                  <div key={method} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                    {method}
+                  </div>
+                ))}
               </div>
             )}
             {tab.tags.length > 0 && (
