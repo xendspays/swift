@@ -485,8 +485,8 @@ function HomePage() {
               <div className="relative hidden sm:block">
                 <div className="absolute inset-10 rounded-[2rem] bg-gradient-to-br from-[#fff7ed] via-white to-[#dbeafe] blur-2xl opacity-70" />
                 <img
-                  src="https://swiftpay.ph/wp-content/themes/SwiftPay/site-assets/images/hero-photo.webp"
-                  alt="A smiling businesswoman managing payments on a tablet"
+                  src="/images/qr-gateway.svg"
+                  alt="Payment gateway QR and settlement illustration"
                   className="float-slow relative z-[2] w-full object-contain object-bottom drop-shadow-[0_30px_70px_rgba(15,23,42,0.12)]"
                   fetchPriority="high"
                 />
