@@ -9,11 +9,12 @@ import { toast } from 'sonner';
 type MerchantConfig = {
   payment_market: string;
   default_settlement_method: 'local_t0' | 'usdt_t0';
+  enabled_payment_methods: string;
 };
 
 export default function PaymentMarkets() {
   const navigate = useNavigate();
-  const [config, setConfig] = useState<MerchantConfig>({ payment_market: 'PH', default_settlement_method: 'local_t0' });
+  const [config, setConfig] = useState<MerchantConfig>({ payment_market: 'PH', default_settlement_method: 'local_t0', enabled_payment_methods: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const market = getPaymentMarket(config.payment_market);
@@ -25,6 +26,7 @@ export default function PaymentMarkets() {
         setConfig({
           payment_market: response.data.payment_market || 'PH',
           default_settlement_method: response.data.default_settlement_method || 'local_t0',
+          enabled_payment_methods: response.data.enabled_payment_methods || '',
         });
       }
     } catch {
@@ -47,6 +49,16 @@ export default function PaymentMarkets() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const methods = [...market.qr, ...market.wallets, ...market.banks];
+  const enabledMethods = new Set(config.enabled_payment_methods.split(',').filter(Boolean));
+  const methodCode = (method: string) => method.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/_+$/g, '');
+  const toggleMethod = (method: string) => {
+    const code = methodCode(method);
+    const next = new Set(enabledMethods);
+    if (next.has(code)) next.delete(code); else next.add(code);
+    setConfig({ ...config, enabled_payment_methods: [...next].join(',') });
   };
 
   if (loading) return <Layout><div className="min-h-[400px] flex items-center justify-center"><Loader2 className="animate-spin text-slate-400" size={32} /></div></Layout>;
@@ -77,9 +89,10 @@ export default function PaymentMarkets() {
 
           <section className="bg-white border border-slate-200 rounded-2xl p-7 shadow-sm">
             <div className="flex items-start justify-between gap-4 mb-7"><div><p className="text-xs font-semibold uppercase tracking-widest text-[#FF6B00] mt-0 mb-2">{market.city}</p><h2 className="text-xl font-semibold text-slate-900 m-0">{market.country} checkout methods</h2><p className="text-sm text-slate-500 mt-2 mb-0">Recommended provider: {market.provider}</p></div><span className="text-xs font-semibold rounded-full bg-slate-100 text-slate-600 px-3 py-1.5 whitespace-nowrap">{market.currency}</span></div>
-            <MethodGroup icon={<QrCode size={18} />} title="QR payments" methods={market.qr} />
-            <MethodGroup icon={<Wallet size={18} />} title="Wallets" methods={market.wallets} />
-            <MethodGroup icon={<Landmark size={18} />} title="Local banks" methods={market.banks} />
+            <p className="text-xs text-slate-500 mb-5">Select the methods this merchant can offer. Only selected methods are returned by public checkout.</p>
+            <MethodGroup icon={<QrCode size={18} />} title="QR payments" methods={market.qr} enabled={enabledMethods} codeFor={methodCode} onToggle={toggleMethod} />
+            <MethodGroup icon={<Wallet size={18} />} title="Wallets" methods={market.wallets} enabled={enabledMethods} codeFor={methodCode} onToggle={toggleMethod} />
+            <MethodGroup icon={<Landmark size={18} />} title="Local banks" methods={market.banks} enabled={enabledMethods} codeFor={methodCode} onToggle={toggleMethod} />
           </section>
         </div>
       </div>
@@ -91,6 +104,6 @@ function SettlementOption({ checked, label, description, onChange }: { checked: 
   return <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${checked ? 'border-[#FF6B00] bg-orange-50' : 'border-slate-200 hover:border-slate-300'}`}><div className="flex items-start gap-3"><input type="radio" checked={checked} onChange={onChange} className="mt-1 accent-[#FF6B00]" /><div><p className="text-sm font-semibold text-slate-900 m-0">{label}</p><p className="text-xs leading-5 text-slate-500 mt-1 mb-0">{description}</p></div></div></label>;
 }
 
-function MethodGroup({ icon, title, methods }: { icon: React.ReactNode; title: string; methods: string[] }) {
-  return <div className="border-t border-slate-100 py-5 first:border-t-0 first:pt-0"><div className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">{icon}{title}</div><div className="flex flex-wrap gap-2">{methods.map((method) => <span key={method} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">{method}<span className="block text-[10px] text-amber-600 mt-0.5">Requires connection</span></span>)}</div></div>;
+function MethodGroup({ icon, title, methods, enabled, codeFor, onToggle }: { icon: React.ReactNode; title: string; methods: string[]; enabled: Set<string>; codeFor: (method: string) => string; onToggle: (method: string) => void }) {
+  return <div className="border-t border-slate-100 py-5 first:border-t-0 first:pt-0"><div className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">{icon}{title}</div><div className="grid sm:grid-cols-2 gap-2">{methods.map((method) => <label key={method} className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer ${enabled.has(codeFor(method)) ? 'border-[#FF6B00] bg-orange-50' : 'border-slate-200 bg-slate-50'}`}><input type="checkbox" checked={enabled.has(codeFor(method))} onChange={() => onToggle(method)} className="accent-[#FF6B00]" /><span className="text-xs font-medium text-slate-700">{method}<span className="block text-[10px] text-slate-500 mt-0.5">Platform provider connection required</span></span></label>)}</div></div>;
 }

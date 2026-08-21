@@ -26,6 +26,7 @@ class ApiConfigResponse(BaseModel):
     permanent_link_slug: Optional[str] = None
     payment_market: str
     default_settlement_method: str
+    enabled_payment_methods: str
 
     test_access_key: str
     test_secret_key: Optional[str] = None
@@ -53,6 +54,7 @@ class ApiConfigUpdate(BaseModel):
     permanent_link_slug: Optional[str] = None
     payment_market: Optional[str] = None
     default_settlement_method: Optional[str] = None
+    enabled_payment_methods: Optional[str] = None
 
     test_callback_url: Optional[str] = None
     test_status_page_mode: Optional[str] = None
@@ -123,6 +125,11 @@ async def update_merchant_api_config(
         raise HTTPException(status_code=400, detail="Unsupported payment market")
     if payload.default_settlement_method is not None and payload.default_settlement_method not in {"local_t0", "usdt_t0"}:
         raise HTTPException(status_code=400, detail="Unsupported default settlement method")
+    if payload.enabled_payment_methods is not None:
+        methods = [method.strip().upper() for method in payload.enabled_payment_methods.split(",") if method.strip()]
+        if len(methods) > 16 or any(not method.replace("_", "").isalnum() for method in methods):
+            raise HTTPException(status_code=400, detail="Invalid enabled payment methods")
+        payload.enabled_payment_methods = ",".join(dict.fromkeys(methods))
 
     stmt = select(MerchantApiConfig).where(MerchantApiConfig.organization_id == current_user.organization_id)
     result = await db.execute(stmt)

@@ -23,6 +23,7 @@ class MerchantApiConfig(Base):
     # selections and must be connected before a method can process live payments.
     payment_market = Column(String(8), nullable=False, default="PH", server_default="PH")
     default_settlement_method = Column(String(32), nullable=False, default="local_t0", server_default="local_t0")
+    enabled_payment_methods = Column(String(512), nullable=False, default="", server_default="")
 
     # API Keys
     test_access_key = Column(String(64), nullable=False, default=lambda: generate_key("TEST_"))

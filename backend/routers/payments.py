@@ -522,6 +522,17 @@ async def get_checkout_institutions(
         if not txn:
             raise HTTPException(status_code=404, detail="Payment not found")
 
+        # Resolve the merchant's explicitly enabled methods before exposing any
+        # provider institution to a public checkout.
+        enabled_methods: set[str] = set()
+        admin_stmt = select(AdminUser).where(AdminUser.telegram_id == txn.user_id).limit(1)
+        admin = (await db.execute(admin_stmt)).scalar_one_or_none()
+        if admin and admin.organization_id:
+            config_stmt = select(MerchantApiConfig).where(MerchantApiConfig.organization_id == admin.organization_id).limit(1)
+            config = (await db.execute(config_stmt)).scalar_one_or_none()
+            if config and config.enabled_payment_methods:
+                enabled_methods = {method.strip().upper() for method in config.enabled_payment_methods.split(",") if method.strip()}
+
         # If it's an international wallet routed to Magpie, don't return PH banks
         if txn.transaction_type in ["alipay_qr", "wechat_qr"]:
             # Optionally return specific Magpie wallet info here if needed
@@ -531,7 +542,15 @@ async def get_checkout_institutions(
         if not res.get("success"):
             return {"success": True, "data": []} # Return empty instead of error for UX
 
-        return res
+        institutions = res.get("data") or []
+        if not enabled_methods:
+            institutions = []
+        else:
+            institutions = [
+                institution for institution in institutions
+                if str(institution.get("code") or "").upper() in enabled_methods
+            ]
+        return {"success": True, "data": institutions}
     except Exception as exc:
         logger.error(f"Error fetching institutions for {identifier}: {exc}")
         return {"success": False, "error": "Could not fetch payment methods"}
