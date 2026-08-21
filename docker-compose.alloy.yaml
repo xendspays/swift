@@ -21,8 +21,8 @@ services:
       dockerfile: Dockerfile
       network: host
       args:
-        VITE_TURNSTILE_SITE_KEY: ""
-        VITE_TELEGRAM_BOT_USERNAME: ""
+        PUBLIC_TURNSTILE_SITE_KEY: ""
+        PUBLIC_TELEGRAM_BOT_USERNAME: ""
     network_mode: host
     restart: unless-stopped
     environment:
