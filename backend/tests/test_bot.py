@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
+from sqlalchemy import select
 
 os.environ["ENVIRONMENT"] = "test"
 
@@ -22,6 +23,9 @@ os.environ["TELEGRAM_ADMIN_IDS"] = "123456789"
 from fastapi.testclient import TestClient
 from main import app  # noqa: E402
 from routers import telegram as telegram_router  # noqa: E402
+from core.database import get_db  # noqa: E402
+from models.admin_users import AdminUser  # noqa: E402
+from models.merchant_api_config import MerchantApiConfig  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -1050,6 +1054,34 @@ class TestSwiftPayEndpointCompatibility:
     )
     def test_xend_payment_endpoints_use_swiftpay_when_configured(self, client, auth_headers, endpoint, expected_type):
         captured: dict = {}
+
+        async def enable_qrph_for_test_merchant():
+            async for session in get_db():
+                admin = (
+                    await session.execute(
+                        select(AdminUser).where(AdminUser.telegram_id == "123456789")
+                    )
+                ).scalar_one()
+                admin.organization_id = "swiftpay-compat-test"
+                config = (
+                    await session.execute(
+                        select(MerchantApiConfig).where(
+                            MerchantApiConfig.organization_id == admin.organization_id
+                        )
+                    )
+                ).scalar_one_or_none()
+                if config:
+                    config.enabled_payment_methods = "QRPH"
+                else:
+                    session.add(
+                        MerchantApiConfig(
+                            organization_id=admin.organization_id,
+                            enabled_payment_methods="QRPH",
+                        )
+                    )
+                await session.commit()
+
+        asyncio.run(enable_qrph_for_test_merchant())
 
         async def fake_create_order(self, *, amount, reference_no, details=None, currency="PHP", generate_customer_redirect_url=True, institution_code=None):
             captured.update({

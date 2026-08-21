@@ -14,6 +14,7 @@ from services.transactions import TransactionsService
 from services.magpie_service import MagpieService
 
 from services.payment_gateway import gateway as payment_gateway
+from services.payment_methods import require_enabled_payment_methods
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ async def create_checkout_session(
     amount = float(payload.get("amount") or payload.get("total") or 0)
     external_id = payload.get("reference_no") or payload.get("external_id") or ""
     description = payload.get("description") or "Checkout session"
+    await require_enabled_payment_methods(db, str(current_user.id), payload.get("payment_method_types"))
 
     return await payment_gateway.create_payment(
         db,
@@ -81,6 +83,7 @@ async def create_qr_payment(
     """Map legacy Magpie QR payment to a SwiftPay order."""
     amount = float(payload.get("amount") or 0)
     external_id = payload.get("reference_no") or payload.get("external_id") or ""
+    await require_enabled_payment_methods(db, str(current_user.id), ["qrph"])
 
     return await payment_gateway.create_payment(
         db,
@@ -110,6 +113,7 @@ async def create_checkout_session_v2(
 
     amount = float(body.get("amount") or 0)
     external_id = body.get("reference_no") or ""
+    await require_enabled_payment_methods(db, str(current_user.id), body.get("payment_method_types"))
 
     service = MagpieService()
     session = await service.create_session(payload=body)

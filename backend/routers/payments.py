@@ -22,6 +22,7 @@ import logging
 
 from services.alipay_service import AlipayService
 from services.wechat_service import WechatService
+from services.payment_methods import enabled_payment_methods_for_user, require_enabled_payment_methods
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,8 @@ async def create_payment(payload: dict, current_user: UserResponse = Depends(get
         raise HTTPException(status_code=400, detail="method must be 'alipay' or 'wechat'")
     if not out_trade_no or not amount:
         raise HTTPException(status_code=400, detail="out_trade_no and amount are required")
+
+    await require_enabled_payment_methods(db, str(current_user.id), [method])
 
     success_url = payload.get("success_url")
     cancel_url = payload.get("cancel_url")
@@ -264,6 +267,10 @@ class UpdatePaymentStatusPayload(BaseModel):
     status: str = "pending"
     provider_reference: str = ""
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CheckoutStartPayload(BaseModel):
+    institution_code: str
 
 
 @router.post("/create")
@@ -522,6 +529,44 @@ async def get_checkout_status(
     except Exception as exc:
         logger.error(f"Error retrieving checkout status {identifier}: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error retrieving payment status") from exc
+
+
+@router.post("/checkout/{identifier}/start")
+async def start_checkout(
+    identifier: str,
+    payload: CheckoutStartPayload,
+    db: AsyncSession = Depends(get_db),
+):
+    """Authorize a public checkout method before exposing its provider URL."""
+    result = await db.execute(
+        select(Transactions)
+        .where(
+            or_(
+                func.lower(Transactions.external_id) == identifier.lower(),
+                func.lower(Transactions.xendit_id) == identifier.lower(),
+            )
+        )
+        .limit(1)
+    )
+    txn = result.scalars().first()
+    if not txn:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    _ensure_checkout_is_available(txn)
+    if not txn.payment_url:
+        raise HTTPException(status_code=409, detail="No checkout URL available")
+
+    institution_code = payload.institution_code.strip().upper()
+    if not institution_code:
+        raise HTTPException(status_code=422, detail="institution_code is required")
+    enabled_methods = await enabled_payment_methods_for_user(db, txn.user_id)
+    if institution_code not in enabled_methods:
+        raise HTTPException(status_code=422, detail="Payment method is not enabled for this merchant")
+
+    parsed = urlparse(txn.payment_url)
+    query = parse_qs(parsed.query)
+    query["institution_code"] = [institution_code]
+    redirect_url = urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+    return {"redirect_url": redirect_url}
 
 
 @router.get("/checkout/{identifier}/institutions")

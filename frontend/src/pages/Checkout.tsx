@@ -172,18 +172,25 @@ export default function Checkout() {
   const digitalWallets = institutions.filter(i => ['MAYA', 'GCASH'].includes(i.code.toUpperCase()));
   const banks = institutions.filter(i => !['MAYA', 'GCASH'].includes(i.code.toUpperCase()));
 
-  const handleStartCheckout = (institutionCode?: string) => {
-    let url = txn.payment_url || txn.qr_code_url || '';
-    if (!url) { toast.error('No checkout URL available'); return; }
+  const handleStartCheckout = async (institutionCode?: string) => {
+    if (!txn.payment_url && !txn.qr_code_url) { toast.error('No checkout URL available'); return; }
 
     if (institutionCode) {
-      const separator = url.includes('?') ? '&' : '?';
-      url = `${url}${separator}institution_code=${institutionCode}`;
-      window.location.href = url;
+      try {
+        const response = await client.post(`/api/v1/payments/checkout/${txn.external_id}/start`, {
+          institution_code: institutionCode,
+        });
+        if (!response.ok || !response.data?.redirect_url) {
+          throw new Error(response.data?.detail || 'Unable to start checkout');
+        }
+        window.location.href = response.data.redirect_url;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Unable to start checkout');
+      }
       return;
     }
 
-    openCheckoutPopup(url);
+    openCheckoutPopup(txn.payment_url || txn.qr_code_url);
     startPollingStatus(txn.external_id);
   };
 

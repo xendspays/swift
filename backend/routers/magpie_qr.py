@@ -19,6 +19,7 @@ from schemas.auth import UserResponse
 from services.magpie_qr_service import MagpieQRService, CurrencyConverter
 from services.magpie_services import MagpieService
 from services.transactions import TransactionsService
+from services.payment_methods import require_enabled_payment_methods
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,7 @@ async def create_alipay_qr(
     
     The service automatically converts PHP to CNY for Alipay processing.
     """
+    await require_enabled_payment_methods(db, str(current_user.id), ["alipay"])
     service = MagpieQRService()
     
     if not service.is_configured:
@@ -261,6 +263,7 @@ async def create_wechat_qr(
     
     The service automatically converts PHP to CNY for WeChat processing.
     """
+    await require_enabled_payment_methods(db, str(current_user.id), ["wechat"])
     service = MagpieQRService()
     
     if not service.is_configured:
@@ -341,6 +344,7 @@ async def create_dynamic_qr(
     
     This endpoint automatically selects the best currency for the payment method.
     """
+    await require_enabled_payment_methods(db, str(current_user.id), [payload.payment_method])
     service = MagpieQRService()
     
     if not service.is_configured:
@@ -413,6 +417,7 @@ async def create_magpie_checkout_session(
     Create a Magpie Checkout Session for Alipay/WeChat Pay.
     Returns a short, branded self-hosted link.
     """
+    await require_enabled_payment_methods(db, str(current_user.id), payload.payment_method_types)
     service = MagpieService()
 
     if not service.api_key:
