@@ -1,9 +1,10 @@
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,7 @@ from services.auth import AuthService
 from services.wallets import WalletsService
 from services.currency_service import CurrencyService
 from services.swiftpay_service import SwiftPayService
+from services.magpie_service import MagpieService
 from services.telegram_service import t, TelegramService
 
 logger = logging.getLogger(__name__)
@@ -60,7 +62,7 @@ class SendUsdtRequest(BaseModel):
     pin: Optional[str] = None
 
 class WalletTopupRequest(BaseModel):
-    amount: float
+    amount: float = Field(gt=0)
     description: str = ""
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
@@ -457,11 +459,23 @@ async def create_wallet_topup(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a PHP top-up checkout invoice using Magpie."""
-    raise HTTPException(
-        status_code=501,
-        detail="Wallet top-up via legacy Magpie support has been removed.",
+    """Create an authenticated legacy Magpie checkout for a wallet top-up."""
+    result = await MagpieService().create_invoice(
+        amount=request.amount,
+        description=request.description or "Wallet top up",
+        customer_name=request.customer_name or "",
+        customer_email=request.customer_email or "",
+        external_id=f"wallet-topup-{current_user.id}-{uuid.uuid4().hex[:12]}",
+        payment_methods=["gcash", "maya"],
     )
+    if not result.get("success"):
+        return {"success": False, "message": result.get("error") or "Unable to create wallet top-up"}
+    return {
+        "success": True,
+        "invoice_id": result.get("checkout_id") or result.get("invoice_id"),
+        "invoice_url": result.get("checkout_url") or result.get("invoice_url"),
+        "external_id": result.get("external_id"),
+    }
 
 
 # ---------- Gateway Balance ----------

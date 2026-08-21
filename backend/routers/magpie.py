@@ -11,6 +11,7 @@ from dependencies.auth import get_payment_user
 from schemas.auth import UserResponse
 from services.swiftpay_service import SwiftPayService
 from services.transactions import TransactionsService
+from services.magpie_service import MagpieService
 
 from services.payment_gateway import gateway as payment_gateway
 
@@ -110,16 +111,30 @@ async def create_checkout_session_v2(
     amount = float(body.get("amount") or 0)
     external_id = body.get("reference_no") or ""
 
-    return await payment_gateway.create_payment(
-        db,
-        user_id=str(current_user.id),
+    service = MagpieService()
+    session = await service.create_session(payload=body)
+    if session.get("success"):
+        return session
+
+    checkout = await service.create_checkout(
         amount=amount,
         description=body.get("description") or "Checkout session v2",
-        transaction_type="payment_link",
         external_id=external_id,
         customer_email=body.get("customer_email"),
         payment_methods=body.get("payment_method_types"),
+        success_url=body.get("success_url"),
+        cancel_url=body.get("cancel_url"),
     )
+    if not checkout.get("success"):
+        return {"success": False, "message": checkout.get("error") or session.get("error")}
+
+    txn = await TransactionsService(db).create_transaction(
+        user_id=str(current_user.id), transaction_type="payment_link", amount=amount,
+        external_id=checkout.get("external_id") or external_id,
+        gateway_id=checkout.get("checkout_id") or "", description=body.get("description") or "Checkout session v2",
+        customer_email=body.get("customer_email") or "", payment_url=checkout.get("checkout_url") or "",
+    )
+    return {"success": True, "data": {"checkout_id": checkout.get("checkout_id"), "transaction_id": getattr(txn, "id", None), "payment_url": checkout.get("checkout_url"), "external_id": checkout.get("external_id"), "gateway": "magpie"}}
 
 
 @router.post("/create-invoice")
@@ -128,15 +143,23 @@ async def create_invoice(
     current_user: UserResponse = Depends(get_payment_user("payments:write")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await payment_gateway.create_payment(
+    # Keep the historical Magpie URL as an authenticated alias of the xend
+    # invoice contract so old clients retain the same scoped authorization.
+    from routers.xend import CreatePaymentRequest, _process_xend_request
+
+    return await _process_xend_request(
         db,
-        user_id=str(current_user.id),
-        amount=data.amount,
-        description=data.description or "Invoice",
-        transaction_type="invoice",
-        customer_name=data.customer_name,
-        customer_email=data.customer_email,
-        payment_methods=data.payment_methods,
+        current_user,
+        CreatePaymentRequest(
+            amount=data.amount,
+            description=data.description,
+            descriptor=data.descriptor,
+            merchant_name=data.merchant_name,
+            customer_name=data.customer_name,
+            customer_email=data.customer_email,
+            payment_methods=data.payment_methods,
+        ),
+        "invoice",
     )
 
 

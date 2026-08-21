@@ -505,11 +505,12 @@ class MagpieService:
     async def create_session(
         self,
         *,
-        amount_cents: int,
-        currency: str,
-        product_name: str,
-        success_url: str,
-        cancel_url: str,
+        payload: Optional[Dict[str, Any]] = None,
+        amount_cents: Optional[int] = None,
+        currency: str = "PHP",
+        product_name: str = "Checkout",
+        success_url: str = "",
+        cancel_url: str = "",
         client_reference_id: Optional[str] = None,
         payment_method_types: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
@@ -518,20 +519,24 @@ class MagpieService:
 
         Documentation: https://magpie.apidocumentation.com/checkout-sessions
         """
-        # Note: Based on technical requirements for Magpie V2,
-        # we use flat line_items structure for maximum compatibility.
-        payload = {
-            "success_url": success_url,
-            "cancel_url": cancel_url,
-            "line_items": [
-                {
-                    "description": product_name,
-                    "amount": amount_cents,
-                    "currency": currency.lower(),
-                    "quantity": 1,
-                }
-            ],
-        }
+        if payload is None:
+            if amount_cents is None:
+                return {"success": False, "error": "amount_cents is required"}
+            # Magpie V2 accepts a flat line-item structure.
+            payload = {
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+                "line_items": [
+                    {
+                        "description": product_name,
+                        "amount": amount_cents,
+                        "currency": currency.lower(),
+                        "quantity": 1,
+                    }
+                ],
+            }
+        else:
+            payload = dict(payload)
 
         if client_reference_id:
             payload["client_reference_id"] = client_reference_id
@@ -539,7 +544,7 @@ class MagpieService:
         if payment_method_types:
             payload["payment_method_types"] = payment_method_types
 
-        logger.info(f"Creating Magpie checkout session for {product_name} ({amount_cents} {currency})")
+        logger.info("Creating Magpie checkout session")
 
         # Override base URL for sessions if it's currently pointing to api.magpie.im
         # pay.magpie.im is the required domain for Checkout Sessions (V2)
@@ -556,10 +561,41 @@ class MagpieService:
 
     # Fallback methods for backward compatibility
     async def create_checkout(self, *args, **kwargs) -> Dict[str, Any]:
-        return self._removed()
+        amount = float(kwargs.get("amount") or 0)
+        if amount <= 0:
+            return {"success": False, "error": "amount must be positive"}
+
+        external_id = kwargs.get("external_id") or kwargs.get("reference_no") or uuid.uuid4().hex
+        description = kwargs.get("description") or "Checkout"
+        payload = {
+            "amount": amount,
+            "currency": (kwargs.get("currency") or "PHP").lower(),
+            "description": description,
+            "success_url": kwargs.get("success_url") or "",
+            "cancel_url": kwargs.get("cancel_url") or "",
+            "client_reference_id": external_id,
+            "external_id": external_id,
+            "payment_method_types": kwargs.get("payment_methods") or kwargs.get("payment_method_types") or [],
+        }
+        for key in ("customer_name", "customer_email", "merchant_name", "descriptor", "metadata"):
+            if kwargs.get(key):
+                payload[key] = kwargs[key]
+
+        result = await self.create_session(payload=payload)
+        if not result.get("success"):
+            return result
+
+        data = result.get("data") or result
+        return {
+            "success": True,
+            "checkout_id": self._pick(data, "id", "session_id", "checkout_id") or external_id,
+            "checkout_url": self._pick(data, "url", "payment_url", "checkout_url"),
+            "external_id": self._pick(data, "external_id", "client_reference_id") or external_id,
+            "raw": data,
+        }
 
     async def create_invoice(self, *args, **kwargs) -> Dict[str, Any]:
-        return self._removed()
+        return await self.create_checkout(*args, **kwargs)
 
     async def create_payment_link(self, *args, **kwargs) -> Dict[str, Any]:
         return self._removed()

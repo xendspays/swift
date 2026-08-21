@@ -1348,7 +1348,10 @@ class TestWalletBalanceConsistency:
             wallet_b = await service.get_or_create_wallet("123456789", "PHP")
 
             assert wallet_a.id == wallet_b.id
-            assert wallet_a.user_id == "123456789"
+            # The seeded admin belongs to an organization, so both user-ID
+            # forms must resolve to that shared organization wallet.
+            assert wallet_a.user_id == "org:swiftpay-ph"
+            assert wallet_a.organization_id == "swiftpay-ph"
 
 
 class TestEvents:

@@ -200,7 +200,10 @@ async def redirect_checkout(request: Request, out_trade_no: str, db: AsyncSessio
 
 
 @router.get("/qr/{out_trade_no}")
-async def get_qr(out_trade_no: str):
+async def get_qr(
+    out_trade_no: str,
+    current_user: UserResponse = Depends(get_payment_user("payments:read")),
+):
     """Return a PNG QR image for a previously-created `out_trade_no`.
 
     This returns an in-memory image created by `/create`. In production you

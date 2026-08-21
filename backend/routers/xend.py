@@ -17,6 +17,7 @@ from core.config import settings
 from services.transactions import TransactionsService
 from models.transactions import Transactions
 from models.disbursements import Disbursements
+from services.magpie_service import MagpieService
 
 from services.payment_gateway import gateway as payment_gateway
 
@@ -263,7 +264,7 @@ async def _process_xend_request(
     request: CreatePaymentRequest,
     transaction_type: str,
 ):
-    return await payment_gateway.create_payment(
+    result = await payment_gateway.create_payment(
         db,
         user_id=str(current_user.id),
         amount=request.amount,
@@ -274,35 +275,63 @@ async def _process_xend_request(
         external_id=request.external_id,
         payment_methods=request.payment_methods,
     )
+    if result.get("success"):
+        return result
 
-    processor = PaymentProcessor(db)
-    result = await processor.create_payment(
-        user_id=str(current_user.id),
+    # Preserve the legacy Magpie contract only as a provider fallback. The
+    # payment endpoint remains protected by payments:write above.
+    magpie = MagpieService()
+    if not getattr(magpie, "api_key", None):
+        return {"success": False, "message": "Magpie API key is not configured"}
+
+    external_id = request.external_id or f"magpie-{transaction_type}-{uuid.uuid4().hex[:12]}"
+    description = request.description or f"{transaction_type} payment"
+    if request.descriptor:
+        description = f"{request.descriptor}: {description}"
+    checkout = await magpie.create_checkout(
         amount=request.amount,
-        description=request.description or f"{transaction_type} payment",
-        currency="PHP",
+        description=description,
+        external_id=external_id,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        merchant_name=request.merchant_name,
+        descriptor=request.descriptor,
+        payment_methods=request.payment_methods,
         metadata={
-            "transaction_type": transaction_type,
+            "descriptor": request.descriptor,
             "merchant_name": request.merchant_name,
-            "customer_name": request.customer_name,
-            "customer_email": request.customer_email,
-            "external_id": request.external_id,
-            "payment_methods": request.payment_methods,
         },
+    )
+    if not checkout.get("success"):
+        return {"success": False, "message": checkout.get("error") or result.get("error") or "Payment provider unavailable"}
+
+    checkout_id = checkout.get("checkout_id") or external_id
+    payment_url = checkout.get("checkout_url") or checkout.get("payment_url") or ""
+    txn = await TransactionsService(db).create_transaction(
+        user_id=str(current_user.id),
+        transaction_type=transaction_type,
+        amount=request.amount,
+        external_id=checkout.get("external_id") or external_id,
+        gateway_id=checkout_id,
+        description=description,
+        customer_name=request.customer_name,
+        customer_email=request.customer_email,
+        payment_url=payment_url,
+        status="pending",
     )
     return {
         "success": True,
-        "message": f"{transaction_type} created",
         "data": {
-            "transaction_id": result["transaction_id"],
-            "payment_id": result["payment_id"],
-            "amount": result["amount"],
-            "currency": result["currency"],
-            "status": result["status"],
-            "source": "internal",
-            "gateway": "internal",
+            "payment_id": checkout_id,
+            "transaction_id": getattr(txn, "id", None),
+            "payment_url": payment_url,
+            "checkout_url": payment_url,
+            "external_id": checkout.get("external_id") or external_id,
+            "gateway": "magpie",
+            "raw": checkout.get("raw"),
         },
     }
+
 
 
 @router.post("/create-invoice")
