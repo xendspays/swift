@@ -496,10 +496,13 @@ class WalletsService(BaseService[Wallets]):
         await self.db.commit()
         transaction_id = await self.db.scalar(
             select(Wallet_transactions.id).where(
-                Wallet_transactions.reference_id == reference_id
+                Wallet_transactions.wallet_id == wallet.id,
+                Wallet_transactions.reference_id == reference_id,
             )
         )
-        await self.publish_wallet_event(wallet.user_id, wallet, f"admin_{action}", abs(amount), 0, note)
+        if transaction_id is None:
+            raise RuntimeError("Wallet adjustment was committed without a ledger entry")
+        await self.publish_wallet_event(wallet.user_id, wallet, f"admin_{action}", abs(amount), transaction_id, note)
 
         return {
             "success": True,
