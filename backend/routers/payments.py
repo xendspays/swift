@@ -22,6 +22,7 @@ import logging
 
 from services.alipay_service import AlipayService
 from services.wechat_service import WechatService
+from services.payment_methods import enabled_payment_methods_for_user, require_enabled_payment_methods
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,20 @@ _CHECKOUT_CACHE: dict = {}
 
 alipay = AlipayService()
 wechat = WechatService()
+
+
+def _ensure_checkout_is_available(txn: Transactions) -> None:
+    """Prevent deactivated or expired payment links from opening public checkout."""
+    if txn.transaction_type not in {"payment_link", "swiftpay_order"}:
+        return
+    if txn.status == "inactive":
+        raise HTTPException(status_code=410, detail="Payment link is inactive")
+    if txn.expires_at:
+        expires_at = txn.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(status_code=410, detail="Payment link has expired")
 
 
 @router.post("/create")
@@ -49,6 +64,8 @@ async def create_payment(payload: dict, current_user: UserResponse = Depends(get
         raise HTTPException(status_code=400, detail="method must be 'alipay' or 'wechat'")
     if not out_trade_no or not amount:
         raise HTTPException(status_code=400, detail="out_trade_no and amount are required")
+
+    await require_enabled_payment_methods(db, str(current_user.id), [method])
 
     success_url = payload.get("success_url")
     cancel_url = payload.get("cancel_url")
@@ -200,7 +217,10 @@ async def redirect_checkout(request: Request, out_trade_no: str, db: AsyncSessio
 
 
 @router.get("/qr/{out_trade_no}")
-async def get_qr(out_trade_no: str):
+async def get_qr(
+    out_trade_no: str,
+    current_user: UserResponse = Depends(get_payment_user("payments:read")),
+):
     """Return a PNG QR image for a previously-created `out_trade_no`.
 
     This returns an in-memory image created by `/create`. In production you
@@ -247,6 +267,10 @@ class UpdatePaymentStatusPayload(BaseModel):
     status: str = "pending"
     provider_reference: str = ""
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CheckoutStartPayload(BaseModel):
+    institution_code: str
 
 
 @router.post("/create")
@@ -398,6 +422,8 @@ async def get_checkout_payment(
         if not txn:
             logger.warning(f"Checkout payment not found: {identifier}")
             raise HTTPException(status_code=404, detail="Payment not found")
+
+        _ensure_checkout_is_available(txn)
         
         # Try to fetch merchant branding
         merchant_name = "SwiftPay Merchant"
@@ -489,6 +515,8 @@ async def get_checkout_status(
         if not txn:
             logger.warning(f"Checkout status not found: {identifier}")
             raise HTTPException(status_code=404, detail="Payment not found")
+
+        _ensure_checkout_is_available(txn)
         
         return {
             "status": txn.status,
@@ -501,6 +529,44 @@ async def get_checkout_status(
     except Exception as exc:
         logger.error(f"Error retrieving checkout status {identifier}: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error retrieving payment status") from exc
+
+
+@router.post("/checkout/{identifier}/start")
+async def start_checkout(
+    identifier: str,
+    payload: CheckoutStartPayload,
+    db: AsyncSession = Depends(get_db),
+):
+    """Authorize a public checkout method before exposing its provider URL."""
+    result = await db.execute(
+        select(Transactions)
+        .where(
+            or_(
+                func.lower(Transactions.external_id) == identifier.lower(),
+                func.lower(Transactions.xendit_id) == identifier.lower(),
+            )
+        )
+        .limit(1)
+    )
+    txn = result.scalars().first()
+    if not txn:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    _ensure_checkout_is_available(txn)
+    if not txn.payment_url:
+        raise HTTPException(status_code=409, detail="No checkout URL available")
+
+    institution_code = payload.institution_code.strip().upper()
+    if not institution_code:
+        raise HTTPException(status_code=422, detail="institution_code is required")
+    enabled_methods = await enabled_payment_methods_for_user(db, txn.user_id)
+    if institution_code not in enabled_methods:
+        raise HTTPException(status_code=422, detail="Payment method is not enabled for this merchant")
+
+    parsed = urlparse(txn.payment_url)
+    query = parse_qs(parsed.query)
+    query["institution_code"] = [institution_code]
+    redirect_url = urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+    return {"redirect_url": redirect_url}
 
 
 @router.get("/checkout/{identifier}/institutions")
@@ -522,6 +588,19 @@ async def get_checkout_institutions(
         if not txn:
             raise HTTPException(status_code=404, detail="Payment not found")
 
+        _ensure_checkout_is_available(txn)
+
+        # Resolve the merchant's explicitly enabled methods before exposing any
+        # provider institution to a public checkout.
+        enabled_methods: set[str] = set()
+        admin_stmt = select(AdminUser).where(AdminUser.telegram_id == txn.user_id).limit(1)
+        admin = (await db.execute(admin_stmt)).scalar_one_or_none()
+        if admin and admin.organization_id:
+            config_stmt = select(MerchantApiConfig).where(MerchantApiConfig.organization_id == admin.organization_id).limit(1)
+            config = (await db.execute(config_stmt)).scalar_one_or_none()
+            if config and config.enabled_payment_methods:
+                enabled_methods = {method.strip().upper() for method in config.enabled_payment_methods.split(",") if method.strip()}
+
         # If it's an international wallet routed to Magpie, don't return PH banks
         if txn.transaction_type in ["alipay_qr", "wechat_qr"]:
             # Optionally return specific Magpie wallet info here if needed
@@ -531,7 +610,17 @@ async def get_checkout_institutions(
         if not res.get("success"):
             return {"success": True, "data": []} # Return empty instead of error for UX
 
-        return res
+        institutions = res.get("data") or []
+        if not enabled_methods:
+            institutions = []
+        else:
+            institutions = [
+                institution for institution in institutions
+                if str(institution.get("code") or "").upper() in enabled_methods
+            ]
+        return {"success": True, "data": institutions}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"Error fetching institutions for {identifier}: {exc}")
         return {"success": False, "error": "Could not fetch payment methods"}

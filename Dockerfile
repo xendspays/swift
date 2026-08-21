@@ -7,13 +7,11 @@ USER root
 
 WORKDIR /app/frontend
 
-ARG VITE_TURNSTILE_SITE_KEY=""
-ARG VITE_TELEGRAM_BOT_USERNAME=""
-ENV VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY}
-ENV VITE_TELEGRAM_BOT_USERNAME=${VITE_TELEGRAM_BOT_USERNAME}
+ARG PUBLIC_TURNSTILE_SITE_KEY=""
+ARG PUBLIC_TELEGRAM_BOT_USERNAME=""
 
 # Warning if turnstile key is missing (CAPTCHA will not work)
-RUN if [ -z "$VITE_TURNSTILE_SITE_KEY" ]; then echo "WARNING: VITE_TURNSTILE_SITE_KEY build arg is not set. CAPTCHA features will be disabled."; fi
+RUN if [ -z "$PUBLIC_TURNSTILE_SITE_KEY" ]; then echo "WARNING: public Turnstile site key is not set. CAPTCHA features will be disabled."; fi
 
 # Enable and pin the exact pnpm version declared in package.json
 RUN corepack enable && corepack prepare pnpm@8.10.0 --activate
@@ -24,7 +22,9 @@ RUN pnpm install --no-frozen-lockfile
 
 # Copy the rest of the frontend source and build
 COPY frontend/ .
-RUN pnpm build
+RUN VITE_TURNSTILE_SITE_KEY="$PUBLIC_TURNSTILE_SITE_KEY" \
+    VITE_TELEGRAM_BOT_USERNAME="$PUBLIC_TELEGRAM_BOT_USERNAME" \
+    pnpm build
 
 # ── Stage 2: Python backend ──────────────────────────────────────────────────
 ## Use the same Python base image from AWS ECR Public mirror to avoid 403 Forbidden errors.
@@ -61,8 +61,8 @@ ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
 ENV LOG_LEVEL=info
 
-# Start the server — attempt migrations with a 35s timeout (non-fatal), then start uvicorn.
-# The asyncpg connection timeout in alembic/env.py is 30 s, so 35 s is enough headroom.
+# Start the server only after all Alembic migration heads have applied. Runtime
+# schema repair is intentionally disabled in production.
 # `exec` replaces the shell with uvicorn so that uvicorn becomes PID 1 and receives
 # SIGTERM directly from the container runtime for graceful shutdown.
-CMD ["sh", "-c", "timeout 35 alembic upgrade head || echo 'Alembic migration timed out or failed, continuing...' ; exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --no-access-log"]
+CMD ["sh", "-c", "alembic upgrade heads && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --no-access-log"]

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { createPaymentLink } from '@/lib/paymentLinks';
 import { client } from '@/lib/api';
 
 export default function CreatePaymentLink() {
@@ -46,6 +45,7 @@ export default function CreatePaymentLink() {
         details: {
           title: title.trim(),
         },
+        expires_at: `${validUntil}T23:59:59Z`,
       };
 
       const response = await client.post('/api/v1/swiftpay/create-order', body);
@@ -63,20 +63,7 @@ export default function CreatePaymentLink() {
         return;
       }
 
-      // Route payment links to the payment-channel selector instead of the raw provider checkout URL.
-      const channelSelectionUrl = `${window.location.origin}/checkout/${reference_no}`;
-
-      const link = createPaymentLink({
-        amount: numericAmount,
-        title: title.trim(),
-        validUntil,
-        payor,
-        orderNo,
-        description,
-        paymentUrl: channelSelectionUrl,
-      });
-
-      navigate(`/pay-by-link/details/${link.code}`);
+      navigate(`/pay-by-link/details/${data.transaction_id}`);
     } catch (err) {
       setError('Unable to create payment link. Please try again.');
     }

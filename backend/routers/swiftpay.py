@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -25,6 +26,7 @@ class SwiftPayOrderRequest(BaseModel):
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
     details: Dict[str, Any] = Field(default_factory=dict)
+    expires_at: Optional[datetime] = None
 
 
 class SwiftPayStatusResponse(BaseModel):
@@ -104,7 +106,7 @@ async def create_swiftpay_order(
     txn_svc = TransactionsService(db)
     txn = await txn_svc.create_transaction(
         user_id=str(current_user.id),
-        transaction_type="swiftpay_order",
+        transaction_type="payment_link",
         amount=payload.amount,
         external_id=payload.reference_no,
         gateway_id=gateway_id,
@@ -114,6 +116,9 @@ async def create_swiftpay_order(
         payment_url=redirect_url,
         status="pending",
         currency=payload.currency,
+        title=str(payload.details.get("title") or "") or None,
+        order_no=payload.reference_no,
+        expires_at=payload.expires_at,
         idempotency_key=payload.reference_no,
     )
 

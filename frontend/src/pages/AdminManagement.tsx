@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import { walletApi } from '../api/wallet';
+import { walletApi, type AdminWalletEntry } from '../api/wallet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1100,15 +1100,6 @@ function PhpWalletsTab({ onError }: { onError: (msg: string) => void }) {
 
 // ── USD Wallets Tab (Super Admin Only) ───────────────────────────────────────
 
-interface UsdWalletEntry {
-  user_id: string;
-  telegram_username: string | null;
-  balance: number;
-  wallet_id: number;
-  is_frozen: boolean;
-  freeze_reason?: string | null;
-}
-
 interface ReconciliationSummary {
   total_wallets: number;
   wallets_with_mismatch: number;
@@ -1128,7 +1119,7 @@ interface ReconciliationSummary {
 }
 
 function UsdWalletsTab({ onError }: { onError: (msg: string) => void }) {
-  const [wallets, setWallets] = useState<UsdWalletEntry[]>([]);
+  const [wallets, setWallets] = useState<AdminWalletEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);

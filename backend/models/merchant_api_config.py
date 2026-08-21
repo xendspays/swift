@@ -19,6 +19,12 @@ class MerchantApiConfig(Base):
     store_logo_url = Column(String(2048), nullable=True)
     permanent_link_slug = Column(String(128), unique=True, index=True, nullable=True)
 
+    # Payment market configuration. Provider credentials remain separate from these
+    # selections and must be connected before a method can process live payments.
+    payment_market = Column(String(8), nullable=False, default="PH", server_default="PH")
+    default_settlement_method = Column(String(32), nullable=False, default="local_t0", server_default="local_t0")
+    enabled_payment_methods = Column(String(512), nullable=False, default="", server_default="")
+
     # API Keys
     test_access_key = Column(String(64), nullable=False, default=lambda: generate_key("TEST_"))
     test_secret_key = Column(String(64), nullable=True)

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { APP_NAME, SUPPORT_URL } from '@/lib/brand';
+import { OFFICIAL_PAYMENT_LOGOS } from '@/config/official-payment-logos';
 import AppFooter from '@/components/AppFooter';
 
 /* ─── Logo helpers (same as Login.tsx) ───────────────────────── */
@@ -273,7 +274,7 @@ export default function Pricing() {
             {[
               { el: <SiIcon src="/logos/alipay.svg" alt="Alipay" bg="#1677FF" size={26} />, name: 'Alipay' },
               { el: <SiIcon src="/logos/wechat.svg" alt="WeChat" bg="#07C160" size={26} />, name: 'WeChat Pay' },
-              { el: <ImgIcon src="/logos/gcash.svg" alt="GCash" size={26} />, name: 'GCash' },
+              { el: <ImgIcon src={OFFICIAL_PAYMENT_LOGOS.gcash} alt="GCash" size={26} />, name: 'GCash' },
               { el: <ImgIcon src="/logos/maya.svg" alt="Maya" size={26} />, name: 'Maya' },
               { el: <SiIcon src="/logos/grab.svg" alt="GrabPay" bg="#00B14F" size={26} />, name: 'GrabPay' },
               { el: <SiIcon src="/logos/tether.svg" alt="USDT" bg="#26A17B" size={26} />, name: 'USDT' },

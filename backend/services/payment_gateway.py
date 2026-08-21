@@ -7,6 +7,7 @@ from services.swiftpay_service import SwiftPayService
 from services.magpie_qr_service import MagpieQRService
 from services.payment_processing import PaymentProcessor
 from services.transactions import TransactionsService
+from services.payment_methods import require_enabled_payment_methods
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,8 @@ class PaymentGateway:
         payment_methods: Optional[list] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        await require_enabled_payment_methods(db, user_id, payment_methods)
+
         # 1. Routing Logic: Prioritize Magpie for Alipay/WeChat Pay
         requested_methods = [m.lower() for m in (payment_methods or [])]
         is_international_wallet = any(m in ["alipay", "wechat", "wechat_pay"] for m in requested_methods)

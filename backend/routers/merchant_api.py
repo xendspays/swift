@@ -24,6 +24,9 @@ class ApiConfigResponse(BaseModel):
     store_name: Optional[str] = None
     store_logo_url: Optional[str] = None
     permanent_link_slug: Optional[str] = None
+    payment_market: str
+    default_settlement_method: str
+    enabled_payment_methods: str
 
     test_access_key: str
     test_secret_key: Optional[str] = None
@@ -49,6 +52,9 @@ class ApiConfigUpdate(BaseModel):
     store_name: Optional[str] = None
     store_logo_url: Optional[str] = None
     permanent_link_slug: Optional[str] = None
+    payment_market: Optional[str] = None
+    default_settlement_method: Optional[str] = None
+    enabled_payment_methods: Optional[str] = None
 
     test_callback_url: Optional[str] = None
     test_status_page_mode: Optional[str] = None
@@ -67,6 +73,34 @@ class ApiConfigUpdate(BaseModel):
 
 class GenerateSecretRequest(BaseModel):
     mode: str  # "test" or "live"
+
+
+@router.get("/provider-status")
+async def get_provider_status(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Return platform provider readiness without exposing any secret material."""
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Organization membership required")
+
+    swiftpay_ready = bool(settings.swiftpay_access_key and settings.swiftpay_secret_key)
+    magpie_ready = bool(settings.magpie_api_key and settings.magpie_secret_key)
+    return {
+        "providers": [
+            {
+                "id": "swiftpay",
+                "name": "SwiftPay",
+                "ready": swiftpay_ready,
+                "methods": ["qr", "wallet", "bank"],
+            },
+            {
+                "id": "magpie",
+                "name": "Magpie",
+                "ready": magpie_ready,
+                "methods": ["wallet", "international"],
+            },
+        ]
+    }
 
 
 @router.get("", response_model=ApiConfigResponse)
@@ -112,6 +146,18 @@ async def update_merchant_api_config(
 ):
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Organization membership required")
+
+    if payload.payment_market is not None and payload.payment_market not in {
+        "GB", "DE", "PT", "BG", "UA", "CN", "KR", "VN", "PH", "IN", "US", "EG", "SG"
+    }:
+        raise HTTPException(status_code=400, detail="Unsupported payment market")
+    if payload.default_settlement_method is not None and payload.default_settlement_method not in {"local_t0", "usdt_t0"}:
+        raise HTTPException(status_code=400, detail="Unsupported default settlement method")
+    if payload.enabled_payment_methods is not None:
+        methods = [method.strip().upper() for method in payload.enabled_payment_methods.split(",") if method.strip()]
+        if len(methods) > 16 or any(not method.replace("_", "").isalnum() for method in methods):
+            raise HTTPException(status_code=400, detail="Invalid enabled payment methods")
+        payload.enabled_payment_methods = ",".join(dict.fromkeys(methods))
 
     stmt = select(MerchantApiConfig).where(MerchantApiConfig.organization_id == current_user.organization_id)
     result = await db.execute(stmt)

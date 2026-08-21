@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
+from sqlalchemy import select
 
 os.environ["ENVIRONMENT"] = "test"
 
@@ -22,6 +23,9 @@ os.environ["TELEGRAM_ADMIN_IDS"] = "123456789"
 from fastapi.testclient import TestClient
 from main import app  # noqa: E402
 from routers import telegram as telegram_router  # noqa: E402
+from core.database import get_db  # noqa: E402
+from models.admin_users import AdminUser  # noqa: E402
+from models.merchant_api_config import MerchantApiConfig  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +63,35 @@ def auth_token(client):
 @pytest.fixture(scope="module")
 def auth_headers(auth_token):
     return {"Authorization": f"Bearer {auth_token}"}
+
+
+async def _set_test_merchant_enabled_methods(*methods: str) -> None:
+    """Configure the shared authenticated merchant for a payment test."""
+    async for session in get_db():
+        admin = (
+            await session.execute(
+                select(AdminUser).where(AdminUser.telegram_id == "123456789")
+            )
+        ).scalar_one()
+        config = (
+            await session.execute(
+                select(MerchantApiConfig).where(
+                    MerchantApiConfig.organization_id == admin.organization_id
+                )
+            )
+        ).scalar_one_or_none()
+        enabled_methods = ",".join(method.upper() for method in methods)
+        if config:
+            config.enabled_payment_methods = enabled_methods
+        else:
+            session.add(
+                MerchantApiConfig(
+                    organization_id=admin.organization_id,
+                    enabled_payment_methods=enabled_methods,
+                )
+            )
+        await session.commit()
+        return
 
 
 # ---------------------------------------------------------------------------
@@ -963,6 +996,7 @@ class TestMagpieTopUpIntegration:
 class TestCheckoutSessionPayloads:
     def test_checkout_session_includes_amount_in_magpie_payload(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("card", "gcash"))
 
         async def fake_create_session(self, *, payload):
             captured.update(payload)
@@ -995,6 +1029,7 @@ class TestCheckoutSessionPayloads:
 
     def test_checkout_session_falls_back_to_checkout_when_session_endpoint_fails(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("card", "gcash"))
 
         async def fake_create_session(self, *, payload):
             return {"success": False, "error": 'Magpie API error (500): {"message": "Internal server error"}'}
@@ -1050,6 +1085,8 @@ class TestSwiftPayEndpointCompatibility:
     )
     def test_xend_payment_endpoints_use_swiftpay_when_configured(self, client, auth_headers, endpoint, expected_type):
         captured: dict = {}
+
+        asyncio.run(_set_test_merchant_enabled_methods("qrph"))
 
         async def fake_create_order(self, *, amount, reference_no, details=None, currency="PHP", generate_customer_redirect_url=True, institution_code=None):
             captured.update({
@@ -1127,6 +1164,7 @@ class TestXenditCollectionFallback:
 class TestxendDescriptorMerchantPropagation:
     def test_create_invoice_forwards_descriptor_and_merchant_name(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("gcash"))
 
         async def fake_magpie_create_checkout(self, *args, **kwargs):
             captured.update(kwargs)
@@ -1172,6 +1210,7 @@ class TestxendDescriptorMerchantPropagation:
 
     def test_legacy_magpie_create_invoice_route_still_works(self, client, auth_headers):
         captured: dict = {}
+        asyncio.run(_set_test_merchant_enabled_methods("gcash"))
 
         async def fake_magpie_create_checkout(self, *args, **kwargs):
             captured.update(kwargs)
@@ -1235,6 +1274,7 @@ class TestPaymentApiKeyAuth:
         service_name = f"xend-int-{int(time.time() * 1000)}"
         key_name = f"payment_api_key_int_{int(time.time() * 1000)}"
         api_key_plain = f"xend_live_{int(time.time() * 1000)}_abcdefghijklmnop"
+        asyncio.run(_set_test_merchant_enabled_methods("gcash"))
 
         create_keys = client.post(
             "/api/v1/entities/api_configs/batch",
@@ -1346,9 +1386,16 @@ class TestWalletBalanceConsistency:
             service = WalletsService(session)
             wallet_a = await service.get_or_create_wallet(123456789, "PHP")
             wallet_b = await service.get_or_create_wallet("123456789", "PHP")
+            admin = (
+                await session.execute(
+                    select(AdminUser).where(AdminUser.telegram_id == "123456789")
+                )
+            ).scalar_one()
 
             assert wallet_a.id == wallet_b.id
-            assert wallet_a.user_id == "123456789"
+            # Both user-ID forms must resolve to the seeded admin's organization wallet.
+            assert wallet_a.user_id == f"org:{admin.organization_id}"
+            assert wallet_a.organization_id == admin.organization_id
 
 
 class TestEvents:
@@ -2152,6 +2199,8 @@ class TestUsdtPhpConversion:
         assert r1.status_code == 200
         assert r1.json()["message"] == f"Successfully credited ₱1,500.00 PHP for {target_user_id}"
         assert r1.json()["balance"] == pytest.approx(1500.0, abs=0.01)
+        credit_transaction_id = r1.json()["transaction_id"]
+        assert credit_transaction_id > 0
 
         r2 = client.post(
             f"/api/v1/wallet/admin/php-wallets/{target_user_id}/adjust",
@@ -2160,6 +2209,8 @@ class TestUsdtPhpConversion:
         )
         assert r2.status_code == 200
         assert r2.json()["balance"] == pytest.approx(1000.0, abs=0.01)
+        debit_transaction_id = r2.json()["transaction_id"]
+        assert debit_transaction_id > 0
 
         async def verify():
             async with db_manager.async_session_maker() as db:
@@ -2178,8 +2229,9 @@ class TestUsdtPhpConversion:
         wallet, txns = asyncio.run(verify())
         assert wallet is not None
         assert wallet.balance == pytest.approx(1000.0, abs=0.01)
+        assert {credit_transaction_id, debit_transaction_id} == {t.id for t in txns}
         assert any(t.transaction_type == "admin_credit" and t.amount == pytest.approx(1500.0, abs=0.01) for t in txns)
-        assert any(t.transaction_type == "admin_debit" and t.amount == pytest.approx(500.0, abs=0.01) for t in txns)
+        assert any(t.transaction_type == "admin_debit" and t.amount == pytest.approx(-500.0, abs=0.01) for t in txns)
 
     def test_admin_php_wallet_adjust_insufficient_balance_is_rejected(self, client, auth_headers):
         """Debiting more than the PHP wallet balance should be rejected."""

@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ const SettingsStoreProfile = React.lazy(() => import('./pages/settings/StoreProf
 const SettingsBanking = React.lazy(() => import('./pages/settings/Banking'));
 const SettingsApiIntegration = React.lazy(() => import('./pages/settings/ApiIntegration'));
 const SettingsTeam = React.lazy(() => import('./pages/settings/Team'));
+const PaymentMarkets = React.lazy(() => import('./pages/settings/PaymentMarkets'));
 const PaymentLinksList = React.lazy(() => import('./pages/paylink/PaymentLinksList'));
 const CreatePaymentLink = React.lazy(() => import('./pages/paylink/CreatePaymentLink'));
 const PaymentLinkDetails = React.lazy(() => import('./pages/paylink/PaymentLinkDetails'));
@@ -51,8 +52,11 @@ const NDAAgreementPage = React.lazy(() => import('./pages/LegalPages').then((m) 
 
 function AuthAwareContent() {
   const { loading, platformBranding } = useAuth();
+  const { pathname } = useLocation();
+  const publicPaths = ['/', '/home', '/login', '/register', '/sign-up-now', '/pricing', '/collection-rates', '/contact', '/privacy-policy', '/terms-of-service', '/nda', '/maintenance'];
+  const isPublicRoute = publicPaths.includes(pathname) || pathname.startsWith('/checkout/') || pathname.startsWith('/pay/') || pathname.startsWith('/auth/') || pathname === '/logout-callback';
 
-  if (loading) {
+  if (loading && !isPublicRoute) {
     return <AppLoadingScreen logoUrl={platformBranding?.logoUrl} storeName={platformBranding?.name} />;
   }
 
@@ -90,7 +94,8 @@ function AuthAwareContent() {
       <Route path="/settings" element={<ProtectedAdminRoute><Settings /></ProtectedAdminRoute>} />
       <Route path="/settings/shop/preferences" element={<ProtectedAdminRoute><SettingsStoreProfile /></ProtectedAdminRoute>} />
       <Route path="/settings/shop/settlement" element={<ProtectedAdminRoute><SettingsBanking /></ProtectedAdminRoute>} />
-      <Route path="/settings/shop/credentials" element={<ProtectedAdminRoute><SettingsApiIntegration /></ProtectedAdminRoute>} />
+       <Route path="/settings/shop/credentials" element={<ProtectedAdminRoute><SettingsApiIntegration /></ProtectedAdminRoute>} />
+       <Route path="/settings/shop/payment-markets" element={<ProtectedAdminRoute><PaymentMarkets /></ProtectedAdminRoute>} />
       <Route path="/settings/user-management" element={<ProtectedAdminRoute><SettingsTeam /></ProtectedAdminRoute>} />
       <Route path="/pay-by-link" element={<ProtectedAdminRoute><PaymentLinksList /></ProtectedAdminRoute>} />
       <Route path="/pay-by-link/new" element={<ProtectedAdminRoute><CreatePaymentLink /></ProtectedAdminRoute>} />

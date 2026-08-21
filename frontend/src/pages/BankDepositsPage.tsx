@@ -195,7 +195,7 @@ export default function BankDepositsPage() {
                           {req.receipt_file_id ? '📎 Receipt uploaded' : '⚠️ No receipt yet'}
                         </span>
                         {req.receipt_file_id && (
-                          <button type="button" onClick={() => openReceiptFile(req.receipt_file_id)}
+                          <button type="button" onClick={() => openReceiptFile(req.receipt_file_id!)}
                             className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 transition-colors">
                             <Eye className="h-3 w-3" /> View
                           </button>

@@ -1,17 +1,16 @@
 # ── Stage 1: Build the React frontend ───────────────────────────────────────
+ARG PY_BASE_IMAGE=public.ecr.aws/docker/library/python:3.11-slim
 FROM cgr.dev/chainguard/node:latest-dev AS frontend-builder
 
 USER root
 
 WORKDIR /app/frontend
 
-ARG VITE_TURNSTILE_SITE_KEY=""
-ARG VITE_TELEGRAM_BOT_USERNAME=""
-ENV VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY}
-ENV VITE_TELEGRAM_BOT_USERNAME=${VITE_TELEGRAM_BOT_USERNAME}
+ARG PUBLIC_TURNSTILE_SITE_KEY=""
+ARG PUBLIC_TELEGRAM_BOT_USERNAME=""
 
 # Warning if turnstile key is missing (CAPTCHA will not work)
-RUN if [ -z "$VITE_TURNSTILE_SITE_KEY" ]; then echo "WARNING: VITE_TURNSTILE_SITE_KEY build arg is not set. CAPTCHA features will be disabled."; fi
+RUN if [ -z "$PUBLIC_TURNSTILE_SITE_KEY" ]; then echo "WARNING: public Turnstile site key is not set. CAPTCHA features will be disabled."; fi
 
 # Enable and pin the exact pnpm version declared in package.json
 RUN corepack enable && corepack prepare pnpm@8.10.0 --activate
@@ -22,10 +21,12 @@ RUN pnpm install --no-frozen-lockfile
 
 # Copy the rest of the frontend source and build
 COPY frontend/ .
-RUN pnpm build
+RUN VITE_TURNSTILE_SITE_KEY="$PUBLIC_TURNSTILE_SITE_KEY" \
+    VITE_TELEGRAM_BOT_USERNAME="$PUBLIC_TELEGRAM_BOT_USERNAME" \
+    pnpm build
 
 # ── Stage 2: Python backend ──────────────────────────────────────────────────
-ARG PY_BASE_IMAGE=public.ecr.aws/docker/library/python:3.11-slim
+ARG PY_BASE_IMAGE
 FROM ${PY_BASE_IMAGE}
 
 WORKDIR /app/backend
@@ -58,5 +59,5 @@ ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
 ENV LOG_LEVEL=info
 
-# Start the server with migrations attempt first
-CMD ["sh", "-c", "timeout 35 python -m alembic upgrade head || echo 'Alembic migration timed out or failed, continuing...' ; exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --no-access-log"]
+# Require all schema migrations before the production server starts.
+CMD ["sh", "-c", "alembic upgrade heads && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --no-access-log"]

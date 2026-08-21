@@ -16,6 +16,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 
 
+async def _apply_payment_callback(
+    db: AsyncSession,
+    external_id: str,
+    provider_reference: str,
+    status: str,
+    gateway_label: str,
+) -> None:
+    """Apply terminal provider status through the idempotent transaction service."""
+    if not external_id:
+        return
+
+    txn_service = TransactionsService(db)
+    txn = await txn_service.find_by_external_or_gateway_id(external_id)
+    if not txn:
+        logger.info("%s webhook: no local transaction for %s", gateway_label, external_id)
+        return
+
+    if provider_reference and not txn.xendit_id:
+        txn.xendit_id = provider_reference
+
+    normalized_status = status.strip().lower()
+    if normalized_status in {"success", "completed", "paid"}:
+        # mark_as_paid returns before touching the wallet for already-settled callbacks.
+        await txn_service.mark_as_paid(txn, gateway_label=gateway_label)
+    elif normalized_status in {"failed", "cancelled", "canceled", "expired"}:
+        await txn_service.mark_as_expired(txn)
+    else:
+        await db.commit()
+
+
 @router.post("/swiftpay")
 async def swiftpay_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """Handle SwiftPay payment callbacks
@@ -36,27 +66,9 @@ async def swiftpay_webhook(request: Request, db: AsyncSession = Depends(get_db))
         
         logger.info(f"SwiftPay webhook: reference_no={reference_no}, status={status}, amount={amount}")
         
-        # Map SwiftPay status to our internal status
-        status_map = {
-            "success": "completed",
-            "completed": "completed",
-            "paid": "completed",
-            "pending": "pending",
-            "failed": "failed",
-            "cancelled": "cancelled",
-        }
-        
-        internal_status = status_map.get(status, status)
-        
-        # Update transaction status
-        if reference_no:
-            txn_service = TransactionsService(db)
-            await txn_service.update_transaction_status(
-                external_id=reference_no,
-                status=internal_status,
-                provider_reference=payment_id
-            )
-            logger.info(f"SwiftPay: Updated transaction {reference_no} to {internal_status}")
+        await _apply_payment_callback(
+            db, reference_no, payment_id, status, gateway_label="SwiftPay"
+        )
         
         return {"success": True, "received": True, "reference_no": reference_no}
     except Exception as e:
@@ -85,27 +97,9 @@ async def magpie_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         
         logger.info(f"Magpie webhook: order_id={order_id}, status={status}, method={payment_method}, amount={amount}")
         
-        # Map Magpie status to our internal status
-        status_map = {
-            "success": "completed",
-            "completed": "completed",
-            "paid": "completed",
-            "pending": "pending",
-            "failed": "failed",
-            "cancelled": "cancelled",
-        }
-        
-        internal_status = status_map.get(status, status)
-        
-        # Update transaction status
-        if order_id:
-            txn_service = TransactionsService(db)
-            await txn_service.update_transaction_status(
-                external_id=order_id,
-                status=internal_status,
-                provider_reference=transaction_id
-            )
-            logger.info(f"Magpie: Updated transaction {order_id} to {internal_status}")
+        await _apply_payment_callback(
+            db, order_id, transaction_id, status, gateway_label="Magpie"
+        )
         
         return {"success": True, "received": True, "order_id": order_id}
     except Exception as e:

@@ -13,7 +13,9 @@ export default function PaymentLinksList() {
   const [links, setLinks] = useState<PaymentLink[]>([]);
 
   useEffect(() => {
-    setLinks(getAllPaymentLinks());
+    getAllPaymentLinks()
+      .then(setLinks)
+      .catch((error: Error) => toast.error(error.message));
   }, []);
 
   const filteredLinks = useMemo(() => {
@@ -101,8 +103,8 @@ export default function PaymentLinksList() {
               {filteredLinks.length > 0 ? (
                 filteredLinks.map((l) => (
                   <tr
-                  key={l.code}
-                  onClick={() => navigate(`/pay-by-link/details/${l.code}`)}
+                  key={l.id}
+                  onClick={() => navigate(`/pay-by-link/details/${l.id}`)}
                   className="cursor-pointer hover:bg-slate-50/30 transition-colors"
                 >
                   <td className="px-8 py-5">
@@ -152,13 +154,15 @@ export default function PaymentLinksList() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const updated = togglePaymentLinkStatus(l.code);
-                          if (updated) {
+                        onClick={async () => {
+                          try {
+                            const updated = await togglePaymentLinkStatus(l);
                             setLinks((current) =>
-                              current.map((item) => (item.code === updated.code ? updated : item))
+                              current.map((item) => (item.id === updated.id ? updated : item))
                             );
                             toast.success(`Link ${updated.status === 'Active' ? 'reactivated' : 'deactivated'}`);
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : 'Unable to update payment link');
                           }
                         }}
                         className="flex items-center gap-2 text-[12px] font-semibold text-slate-600 hover:text-rose-500 transition-colors"
