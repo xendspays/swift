@@ -393,7 +393,7 @@ export default function CreatePayment() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">Enable Multiple Payments</span>
-                  <Info className="h-4 w-4 text-slate-400 cursor-help" title="Allow this link to be paid multiple times by different customers" />
+                  <Info className="h-4 w-4 text-slate-400 cursor-help" aria-label="Allow this link to be paid multiple times by different customers" />
                 </div>
                 <p className="text-xs text-slate-600 font-medium">Allow this link to be paid multiple times</p>
               </div>
