@@ -2152,6 +2152,8 @@ class TestUsdtPhpConversion:
         assert r1.status_code == 200
         assert r1.json()["message"] == f"Successfully credited ₱1,500.00 PHP for {target_user_id}"
         assert r1.json()["balance"] == pytest.approx(1500.0, abs=0.01)
+        credit_transaction_id = r1.json()["transaction_id"]
+        assert credit_transaction_id > 0
 
         r2 = client.post(
             f"/api/v1/wallet/admin/php-wallets/{target_user_id}/adjust",
@@ -2160,6 +2162,8 @@ class TestUsdtPhpConversion:
         )
         assert r2.status_code == 200
         assert r2.json()["balance"] == pytest.approx(1000.0, abs=0.01)
+        debit_transaction_id = r2.json()["transaction_id"]
+        assert debit_transaction_id > 0
 
         async def verify():
             async with db_manager.async_session_maker() as db:
@@ -2178,6 +2182,7 @@ class TestUsdtPhpConversion:
         wallet, txns = asyncio.run(verify())
         assert wallet is not None
         assert wallet.balance == pytest.approx(1000.0, abs=0.01)
+        assert {credit_transaction_id, debit_transaction_id} == {t.id for t in txns}
         assert any(t.transaction_type == "admin_credit" and t.amount == pytest.approx(1500.0, abs=0.01) for t in txns)
         assert any(t.transaction_type == "admin_debit" and t.amount == pytest.approx(500.0, abs=0.01) for t in txns)
 

@@ -469,6 +469,7 @@ class WalletsService(BaseService[Wallets]):
             raise ValueError("Amount must be non-zero")
 
         currency_upper = currency.upper()
+        reference_id = f"admin-adj-{uuid.uuid4().hex[:8]}"
 
         if amount > 0:
             wallet = await self.credit_wallet(
@@ -476,7 +477,7 @@ class WalletsService(BaseService[Wallets]):
                 amount=amount,
                 currency=currency_upper,
                 transaction_type="admin_credit",
-                reference_id=f"admin-adj-{uuid.uuid4().hex[:8]}",
+                reference_id=reference_id,
                 note=note or f"Admin credit by {admin_id}"
             )
             action = "credited"
@@ -486,19 +487,25 @@ class WalletsService(BaseService[Wallets]):
                 amount=abs(amount),
                 currency=currency_upper,
                 transaction_type="admin_debit",
-                reference_id=f"admin-adj-{uuid.uuid4().hex[:8]}",
+                reference_id=reference_id,
                 note=note or f"Admin debit by {admin_id}",
                 check_liquidity=True
             )
             action = "debited"
 
         await self.db.commit()
+        transaction_id = await self.db.scalar(
+            select(Wallet_transactions.id).where(
+                Wallet_transactions.reference_id == reference_id
+            )
+        )
         await self.publish_wallet_event(wallet.user_id, wallet, f"admin_{action}", abs(amount), 0, note)
 
         return {
             "success": True,
             "balance": wallet.balance,
-            "action": action
+            "action": action,
+            "transaction_id": transaction_id,
         }
 
     async def publish_wallet_event(self, user_id: str, wallet: Wallets, transaction_type: str, amount: float, txn_id: int, note: str = "", skip_bot_notify: bool = False):
