@@ -37,6 +37,11 @@ services:
       INITIALIZE_DEMO_DATA: "1"
       DISABLE_BACKGROUND_TASKS: "1"
       PYTHON_BACKEND_URL: http://127.0.0.1:8000
+      SWIFTPAY_ACCESS_KEY: ${SWIFTPAY_ACCESS_KEY:-}
+      SWIFTPAY_SECRET_KEY: ${SWIFTPAY_SECRET_KEY:-}
+      SWIFTPAY_MODE: ${SWIFTPAY_MODE:-sandbox}
+      MAGPIE_API_KEY: ${MAGPIE_API_KEY:-}
+      MAGPIE_SECRET_KEY: ${MAGPIE_SECRET_KEY:-}
     depends_on:
       db:
         condition: service_healthy
