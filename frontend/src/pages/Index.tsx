@@ -71,7 +71,7 @@ const SOLUTION_TABS = [
     label: 'Payment Routing',
     Icon: Shuffle,
     heading: 'One integration across all payment rails',
-    body: 'Route transactions intelligently across providers with built-in failover and transaction management.',
+    body: 'Configure available payment methods and manage transaction workflows from one merchant platform.',
     tags: ['Multi-rail routing', 'Failover logic', 'Transaction management', 'Single API integration'],
     showPaymentMethods: false,
     dark: { heading: 'Availability controls', body: 'Automatically reroute transactions to maintain uptime and success rates.' },
@@ -91,8 +91,8 @@ const SOLUTION_TABS = [
     label: 'Fraud Management',
     Icon: Shield,
     heading: 'Protect every transaction',
-    body: 'Philippine-built Fraud Management System that scores every transaction before it completes, meeting AFASA and BSP Circular 1213 requirements out of the box.',
-    tags: ['BSP 1213-aligned', 'AFASA-ready', 'ISO 27001 & PCI DSS'],
+    body: 'Centralize payment review, approval controls, and transaction records as your risk processes mature.',
+    tags: ['Transaction review', 'Approval controls', 'Audit records'],
     showPaymentMethods: false,
     dark: { heading: '40+ tunable rules across six categories', body: 'AML & structuring · Sanctions & watchlists · Behavioral · Fraud & mule · Volume & threshold · Account, access & location[...]'},
   },
@@ -300,13 +300,13 @@ function HomePage() {
   const features = [
     { Icon: CreditCard, heading: 'Accept every payment', body: "Let customers pay using the methods they already trust, without adding new systems.", chipCls: 'bg-[#fce4d2] text-[#f97316]' },
     { Icon: Zap, heading: 'Go live quickly', body: 'Start accepting payments without long integration cycles or rebuilding your setup.', chipCls: 'bg-[#d7f3f0] text-[#0fb5a3]' },
-    { Icon: TrendingUp, heading: 'Get paid faster', body: 'Access your funds sooner with same-day settlement where available.', chipCls: 'bg-[#e6e4fa] text-[#8b5cf6]' },
+    { Icon: TrendingUp, heading: 'Track settlement preferences', body: 'Choose local or USDT settlement preferences while provider settlement is configured.', chipCls: 'bg-[#e6e4fa] text-[#8b5cf6]' },
     { Icon: RefreshCw, heading: 'Reconcile automatically', body: 'Match and record every transaction automatically, without manual work.', chipCls: 'bg-[#e2eefb] text-[#3b82f6]' },
   ];
 
   const features2 = [
     { Icon: Layers, heading: 'Handle high volume', body: 'Process large payment volumes reliably without operational bottlenecks.', chipCls: 'bg-[#ddf4e3] text-[#17b364]' },
-    { Icon: ShieldCheck, heading: 'Stay secure and compliant', body: 'Operate with PCI DSS, BSP, and ISO 27001 standards built in.', chipCls: 'bg-[#ffefc9] text-[#f59e0b]' },
+    { Icon: ShieldCheck, heading: 'Build safer operations', body: 'Use authenticated merchant settings, server-authorized checkout, and auditable payment links.', chipCls: 'bg-[#ffefc9] text-[#f59e0b]' },
     { Icon: Bell, heading: 'Fast local support', body: 'Get help from a Philippines-based team that resolves issues quickly.', chipCls: 'bg-[#fce4d2] text-[#f97316]' },
   ];
 
@@ -465,7 +465,7 @@ function HomePage() {
                   Accept payments, manage subscriptions, and send payouts across all major channels in one unified platform. Automated reconciliation and reporting integrated into your existing systems.
                 </p>
                 <ul className="mb-10 flex flex-wrap gap-x-6 gap-y-5">
-                  {['Settle same-day', 'Automated reconciliation', 'Local support'].map(item => (
+                  {['Provider-backed checkout', 'Server-authorized links', 'Local support'].map(item => (
                     <li key={item} className="flex items-center gap-2 text-[14px] font-semibold text-[#2c2c2c]">
                       <CheckCircle2 className="h-[18px] w-[18px] flex-none text-[#20c997]" strokeWidth={2.5} />
                       {item}
@@ -525,17 +525,16 @@ function HomePage() {
           </div>
         </section>
 
-        {/* ── Client logos marquee ──────────────────────────── */}
-        <section className="border-t border-[#f2f2f2]" style={{ paddingBlock: 'clamp(40px,5vw,64px)' }} aria-label="Trusted by leading enterprises">
-          <p className="mb-8 text-center text-[13px] font-semibold uppercase tracking-[0.1em] text-[#9a9a9a]">Trusted by leading enterprises</p>
+        {/* ── Merchant capabilities ─────────────────────────── */}
+        <section className="border-t border-[#f2f2f2]" style={{ paddingBlock: 'clamp(40px,5vw,64px)' }} aria-label="Merchant capabilities">
+          <p className="mb-8 text-center text-[13px] font-semibold uppercase tracking-[0.1em] text-[#9a9a9a]">Built for merchant operations</p>
           <div
             className="marquee-wrap overflow-hidden"
             style={{ WebkitMaskImage: 'linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)', maskImage: 'linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)' }}
           >
             <div className="marquee-track flex w-max items-center" style={{ gap: 'clamp(64px,8vw,120px)' }}>
-              {[...clientLogos, ...clientLogos].map((logo, i) => (
-                <img key={i} src={logo.src} alt={i < clientLogos.length ? logo.alt : ''} aria-hidden={i >= clientLogos.length}
-                  className="max-h-[44px] w-auto opacity-50 grayscale transition-all hover:opacity-100 hover:grayscale-0" loading="lazy" />
+              {['Hosted payment links', 'Merchant payment methods', 'Provider readiness', 'Checkout authorization', 'Settlement preferences', 'Transaction records'].concat(['Hosted payment links', 'Merchant payment methods', 'Provider readiness', 'Checkout authorization', 'Settlement preferences', 'Transaction records']).map((capability, i) => (
+                <span key={i} aria-hidden={i >= 6} className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600">{capability}</span>
               ))}
             </div>
           </div>
@@ -553,9 +552,9 @@ function HomePage() {
             </h2>
             <div className="mx-auto grid max-w-[920px] grid-cols-1 gap-8 sm:grid-cols-3">
               {[
-                { value: '₱57B+', label: 'processed' },
-                { value: '30M+', label: 'monthly, zero downtime*' },
-                { value: '500+', label: 'businesses served' },
+                { value: '1', label: 'merchant payment configuration' },
+                { value: '2', label: 'provider readiness states' },
+                { value: '0', label: 'unapproved checkout methods' },
               ].map(stat => (
                 <div key={stat.label}>
                   <div className="font-semibold leading-[1.05] tracking-[-0.02em]" style={{ fontSize: 'clamp(2.6rem,5vw,4rem)' }}>{stat.value}</div>
@@ -563,7 +562,7 @@ function HomePage() {
                 </div>
               ))}
             </div>
-            <p className="mt-8 text-[12px] leading-relaxed text-white/[0.42]">*No payment failures on record to date.</p>
+            <p className="mt-8 text-[12px] leading-relaxed text-white/[0.42]">Checkout options are only shown after merchant and provider authorization.</p>
           </div>
         </section>
 
