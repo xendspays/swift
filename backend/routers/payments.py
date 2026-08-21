@@ -35,6 +35,20 @@ alipay = AlipayService()
 wechat = WechatService()
 
 
+def _ensure_checkout_is_available(txn: Transactions) -> None:
+    """Prevent deactivated or expired payment links from opening public checkout."""
+    if txn.transaction_type not in {"payment_link", "swiftpay_order"}:
+        return
+    if txn.status == "inactive":
+        raise HTTPException(status_code=410, detail="Payment link is inactive")
+    if txn.expires_at:
+        expires_at = txn.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(status_code=410, detail="Payment link has expired")
+
+
 @router.post("/create")
 async def create_payment(payload: dict, current_user: UserResponse = Depends(get_payment_user("payments:write")), db: AsyncSession = Depends(get_db)):
     """Create a payment QR for `method` in payload ('alipay' or 'wechat').
@@ -401,6 +415,8 @@ async def get_checkout_payment(
         if not txn:
             logger.warning(f"Checkout payment not found: {identifier}")
             raise HTTPException(status_code=404, detail="Payment not found")
+
+        _ensure_checkout_is_available(txn)
         
         # Try to fetch merchant branding
         merchant_name = "SwiftPay Merchant"
@@ -492,6 +508,8 @@ async def get_checkout_status(
         if not txn:
             logger.warning(f"Checkout status not found: {identifier}")
             raise HTTPException(status_code=404, detail="Payment not found")
+
+        _ensure_checkout_is_available(txn)
         
         return {
             "status": txn.status,
@@ -525,6 +543,8 @@ async def get_checkout_institutions(
         if not txn:
             raise HTTPException(status_code=404, detail="Payment not found")
 
+        _ensure_checkout_is_available(txn)
+
         # Resolve the merchant's explicitly enabled methods before exposing any
         # provider institution to a public checkout.
         enabled_methods: set[str] = set()
@@ -554,6 +574,8 @@ async def get_checkout_institutions(
                 if str(institution.get("code") or "").upper() in enabled_methods
             ]
         return {"success": True, "data": institutions}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"Error fetching institutions for {identifier}: {exc}")
         return {"success": False, "error": "Could not fetch payment methods"}

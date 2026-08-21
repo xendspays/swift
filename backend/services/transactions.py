@@ -70,6 +70,9 @@ class TransactionsService(BaseService[Transactions]):
         receipt_file_id: Optional[str] = None,
         status: str = "pending",
         currency: str = "PHP",
+        title: Optional[str] = None,
+        order_no: Optional[str] = None,
+        expires_at: Optional[datetime] = None,
         metadata: Optional[Dict[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> Transactions:
@@ -95,16 +98,49 @@ class TransactionsService(BaseService[Transactions]):
             external_id=external_id,
             xendit_id=gateway_id,  # Using xendit_id column for gateway reference
             status=status,
+            title=title,
+            order_no=order_no,
             description=description,
             customer_name=customer_name,
             customer_email=customer_email,
             payment_url=payment_url,
             receipt_file_id=receipt_file_id,
+            expires_at=expires_at,
             created_at=now,
             updated_at=now,
         )
         # Handle metadata if we ever add a metadata column to Transactions
         self.db.add(txn)
+        await self.db.commit()
+        await self.db.refresh(txn)
+        return txn
+
+    async def list_payment_links(self, user_id: str, skip: int = 0, limit: int = 100) -> List[Transactions]:
+        """Return only payment-link transactions owned by the requesting merchant."""
+        result = await self.db.execute(
+            select(Transactions)
+            .where(
+                Transactions.user_id == user_id,
+                Transactions.transaction_type.in_(("payment_link", "swiftpay_order")),
+            )
+            .order_by(Transactions.id.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def set_payment_link_active(
+        self, transaction_id: int, user_id: str, is_active: bool
+    ) -> Optional[Transactions]:
+        """Activate or deactivate an unpaid payment link without altering settled outcomes."""
+        txn = await self.get_by_id(transaction_id, user_id=user_id)
+        if not txn or txn.transaction_type not in {"payment_link", "swiftpay_order"}:
+            return None
+        if txn.status not in {"pending", "inactive"}:
+            raise ValueError("Only pending or inactive payment links can be changed")
+
+        txn.status = "pending" if is_active else "inactive"
+        txn.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(txn)
         return txn

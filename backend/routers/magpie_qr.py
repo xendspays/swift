@@ -459,7 +459,7 @@ async def create_magpie_checkout_session(
             qr_code_url=None,
             description=payload.product_name,
             customer_email=payload.customer_email,
-            transaction_type="magpie_checkout",
+            transaction_type="payment_link",
             payment_url=magpie_url
         )
 

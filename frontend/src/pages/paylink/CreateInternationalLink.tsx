@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Globe } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { createPaymentLink } from '@/lib/paymentLinks';
 import { client } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -61,21 +60,8 @@ export default function CreateInternationalLink() {
         return;
       }
 
-      const channelSelectionUrl = response.data.checkout_url;
-
-      // We reuse the existing paymentLinks library to store local history of the link
-      const link = createPaymentLink({
-        amount: numericAmount,
-        title: productName.trim(),
-        validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        payor,
-        orderNo: reference_id,
-        description: `International Payment (${currency})`,
-        paymentUrl: channelSelectionUrl,
-      });
-
       toast.success('International payment link generated');
-      navigate(`/pay-by-link/details/${link.code}`);
+      navigate('/pay-by-link');
     } catch (err) {
       setError('Unable to create payment link. Please try again.');
     } finally {

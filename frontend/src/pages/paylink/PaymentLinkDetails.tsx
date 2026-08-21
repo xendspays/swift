@@ -18,7 +18,9 @@ export default function PaymentLinkDetails() {
       return;
     }
 
-    setLink(getPaymentLink(code));
+    getPaymentLink(code)
+      .then(setLink)
+      .catch(() => setLink(null));
   }, [code]);
 
   if (!link) {
@@ -127,12 +129,14 @@ export default function PaymentLinkDetails() {
             </button>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (!link) return;
-                const updated = togglePaymentLinkStatus(link.code);
-                if (updated) {
+                try {
+                  const updated = await togglePaymentLinkStatus(link);
                   setLink(updated);
                   toast.success(`Link ${updated.status === 'Active' ? 'reactivated' : 'deactivated'}`);
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'Unable to update payment link');
                 }
               }}
               className="h-9 px-6 bg-white border border-slate-200 rounded-lg text-[12px] font-semibold text-slate-900 hover:bg-slate-50 flex items-center gap-2"
