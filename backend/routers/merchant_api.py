@@ -75,6 +75,34 @@ class GenerateSecretRequest(BaseModel):
     mode: str  # "test" or "live"
 
 
+@router.get("/provider-status")
+async def get_provider_status(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Return platform provider readiness without exposing any secret material."""
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Organization membership required")
+
+    swiftpay_ready = bool(settings.swiftpay_access_key and settings.swiftpay_secret_key)
+    magpie_ready = bool(settings.magpie_api_key and settings.magpie_secret_key)
+    return {
+        "providers": [
+            {
+                "id": "swiftpay",
+                "name": "SwiftPay",
+                "ready": swiftpay_ready,
+                "methods": ["qr", "wallet", "bank"],
+            },
+            {
+                "id": "magpie",
+                "name": "Magpie",
+                "ready": magpie_ready,
+                "methods": ["wallet", "international"],
+            },
+        ]
+    }
+
+
 @router.get("", response_model=ApiConfigResponse)
 async def get_merchant_api_config(
     current_user: UserResponse = Depends(get_current_user),

@@ -17,6 +17,7 @@ export default function PaymentMarkets() {
   const [config, setConfig] = useState<MerchantConfig>({ payment_market: 'PH', default_settlement_method: 'local_t0', enabled_payment_methods: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [providers, setProviders] = useState<{ name: string; ready: boolean; methods: string[] }[]>([]);
   const market = getPaymentMarket(config.payment_market);
 
   const load = useCallback(async () => {
@@ -29,6 +30,8 @@ export default function PaymentMarkets() {
           enabled_payment_methods: response.data.enabled_payment_methods || '',
         });
       }
+      const providerResponse = await client.get('/api/v1/merchant/api-config/provider-status');
+      if (providerResponse.ok) setProviders(providerResponse.data.providers || []);
     } catch {
       toast.error('Unable to load payment market settings');
     } finally {
@@ -73,6 +76,10 @@ export default function PaymentMarkets() {
         </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex gap-3 text-amber-900"><CircleAlert className="shrink-0 text-amber-600" size={20} /><p className="text-sm leading-6 m-0"><strong>Provider-ready configuration.</strong> The methods below are market recommendations. They remain unavailable for live payment processing until your business completes provider onboarding and adds approved credentials.</p></div>
+
+        <div className="grid sm:grid-cols-2 gap-4 mb-8">
+          {providers.map((provider) => <div key={provider.name} className="rounded-xl border border-slate-200 bg-white px-5 py-4 flex items-center justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900 m-0">{provider.name}</p><p className="text-xs text-slate-500 mt-1 mb-0">{provider.methods.join(' · ')}</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${provider.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{provider.ready ? 'Platform connected' : 'Provider setup required'}</span></div>)}
+        </div>
 
         <div className="grid lg:grid-cols-[1fr_1.4fr] gap-8 items-start">
           <section className="bg-white border border-slate-200 rounded-2xl p-7 shadow-sm">
