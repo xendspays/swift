@@ -75,10 +75,10 @@ export default function PaymentMarkets() {
           <button onClick={save} disabled={saving} className="inline-flex items-center justify-center gap-2 bg-[#FF6B00] text-white px-6 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"><>{saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}</>Save changes</button>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex gap-3 text-amber-900"><CircleAlert className="shrink-0 text-amber-600" size={20} /><p className="text-sm leading-6 m-0"><strong>Provider-ready configuration.</strong> The methods below are market recommendations. They remain unavailable for live payment processing until your business completes provider onboarding and adds approved credentials.</p></div>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex gap-3 text-amber-900"><CircleAlert className="shrink-0 text-amber-600" size={20} /><p className="text-sm leading-6 m-0"><strong>Provider-ready configuration.</strong> The methods below are market recommendations. Credential status confirms server configuration only; complete provider onboarding and verify the provider connection before accepting live payments.</p></div>
 
         <div className="grid sm:grid-cols-2 gap-4 mb-8">
-          {providers.map((provider) => <div key={provider.name} className="rounded-xl border border-slate-200 bg-white px-5 py-4 flex items-center justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900 m-0">{provider.name}</p><p className="text-xs text-slate-500 mt-1 mb-0">{provider.methods.join(' · ')}</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${provider.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{provider.ready ? 'Platform connected' : 'Provider setup required'}</span></div>)}
+          {providers.map((provider) => <div key={provider.name} className="rounded-xl border border-slate-200 bg-white px-5 py-4 flex items-center justify-between gap-4"><div><p className="text-sm font-semibold text-slate-900 m-0">{provider.name}</p><p className="text-xs text-slate-500 mt-1 mb-0">{provider.methods.join(' · ')}</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${provider.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{provider.ready ? 'Credentials configured' : 'Credentials required'}</span></div>)}
         </div>
 
         <div className="grid lg:grid-cols-[1fr_1.4fr] gap-8 items-start">
