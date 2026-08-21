@@ -102,7 +102,7 @@ async def create_checkout_session_v2(
     current_user: UserResponse = Depends(get_payment_user("payments:write")),
     db: AsyncSession = Depends(get_db),
 ):
-    body = payload.dict()
+    body = payload.model_dump()
     if not body.get("amount") and body.get("line_items"):
         total_cents = 0
         for item in body.get("line_items", []):
