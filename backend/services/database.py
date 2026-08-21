@@ -8,6 +8,12 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 
+def schema_management_enabled() -> bool:
+    """Allow automatic schema creation only outside managed production deploys."""
+    environment = os.getenv("ENVIRONMENT", "production").strip().lower()
+    return environment in {"dev", "development", "local", "test"} or os.getenv("ALLOW_SCHEMA_REPAIR") == "1"
+
+
 async def check_database_health() -> bool:
     """Check if database is healthy"""
     start_time = time.time()
@@ -66,6 +72,10 @@ async def initialize_database():
 
         logger.info("🔧 Starting database initialization...")
         await db_manager.init_db()
+        if not schema_management_enabled():
+            logger.info("Production schema management is disabled; expecting Alembic migrations to be current")
+            return
+
         logger.info("🔧 Database connection initialized, now creating tables if tables not exist...")
         await db_manager.create_tables()
         logger.info("🔧 Table creation completed")
