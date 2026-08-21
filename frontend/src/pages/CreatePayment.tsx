@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import Layout from '@/components/Layout';
 import SiteContainer from '@/components/SiteContainer';
 import { APP_NAME } from '@/lib/brand';
+import { OFFICIAL_PAYMENT_LOGOS } from '@/config/official-payment-logos';
 
 // Expanded set of UI values; we'll normalize some to API channel names when sending
 type PaymentMethodValue =
@@ -59,7 +60,7 @@ const METHOD_OPTIONS: { value: PaymentMethodValue; label: string; logo: string }
 
   // canonical channels
   { value: 'card', label: 'Card (All Cards)', logo: '/logos/card.svg' },
-  { value: 'gcash', label: 'GCash', logo: '/logos/gcash.svg' },
+  { value: 'gcash', label: 'GCash', logo: OFFICIAL_PAYMENT_LOGOS.gcash },
   { value: 'maya', label: 'Maya', logo: '/logos/maya.svg' },
   { value: 'grabpay', label: 'GrabPay', logo: '/logos/grab.svg' },
   { value: 'alipay', label: 'Alipay', logo: '/logos/alipay.svg' },

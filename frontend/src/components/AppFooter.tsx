@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Bot, MessageCircle, Shield, FileText, ExternalLink, Globe, Terminal, ShieldCheck, Phone } from 'lucide-react';
 import { APP_NAME, COMPANY_NAME, SUPPORT_URL, SUPPORT_HANDLE, APP_TAGLINE } from '@/lib/brand';
+import { OFFICIAL_PAYMENT_LOGOS } from '@/config/official-payment-logos';
 
 /* ─── Logo helpers ───────────────────────────────── */
 function SiIcon({ src, alt, bg, size = 22 }: { src: string; alt: string; bg: string; size?: number }) {
@@ -26,7 +27,7 @@ const PAYMENT_BRANDS = [
   { el: <SiIcon src="/logos/wechat.svg"     alt="WeChat Pay" bg="#07C160" size={22} />, name: 'WeChat Pay' },
   { el: <div className="flex h-[22px] w-[22px] items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-[8px] font-bold text-slate-700">UP</div>, name: 'UnionPay' },
   { el: <div className="flex h-[22px] w-[22px] items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-[8px] font-bold text-slate-700">JCB</div>, name: 'JCB' },
-  { el: <ImgIcon src="/logos/gcash.svg"     alt="GCash"      size={14} />,               name: 'GCash' },
+  { el: <ImgIcon src={OFFICIAL_PAYMENT_LOGOS.gcash} alt="GCash" size={14} />,              name: 'GCash' },
   { el: <ImgIcon src="/logos/maya.svg"      alt="Maya"       size={18} />,               name: 'Maya' },
   { el: <SiIcon src="/logos/grab.svg"       alt="GrabPay"    bg="#00B14F" size={22} />, name: 'GrabPay' },
   { el: <ImgIcon src="/logos/bpi.png"       alt="BPI"        size={22} />,               name: 'BPI' },

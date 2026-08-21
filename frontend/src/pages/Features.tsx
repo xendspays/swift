@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppFooter from '@/components/AppFooter';
+import { OFFICIAL_PAYMENT_LOGOS } from '@/config/official-payment-logos';
 import {
   Bot,
   BarChart3,
@@ -651,7 +652,7 @@ export default function Features() {
           <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider text-center mb-4">E-Wallets</p>
           <div className="flex flex-wrap justify-center gap-3">
             {[
-              { src: '/logos/gcash.svg', label: 'GCash', bg: 'bg-blue-500/10 border-blue-500/20' },
+              { src: OFFICIAL_PAYMENT_LOGOS.gcash, label: 'GCash', bg: 'bg-blue-500/10 border-blue-500/20' },
               { src: '/logos/maya.svg', label: 'Maya', bg: 'bg-green-500/10 border-green-500/20' },
               { src: '/logos/grab.svg', label: 'GrabPay', bg: 'bg-green-600/10 border-green-600/20' },
               { src: '/logos/alipay.svg', label: 'Alipay', bg: 'bg-sky-500/10 border-sky-500/20' },
@@ -791,4 +792,3 @@ export default function Features() {
     </div>
   );
 }
-

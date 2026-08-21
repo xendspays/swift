@@ -1,3 +1,5 @@
+import { OFFICIAL_PAYMENT_LOGOS } from './official-payment-logos';
+
 /**
  * Payment Channel Configuration
  * Maps available payment methods to their logos, categories, and metadata
@@ -29,7 +31,7 @@ export const PAYMENT_METHODS_CATALOG: PaymentMethodConfig[] = [
     id: 'gcash',
     code: 'GCASH',
     name: 'GCash',
-    logo: '/logos/gcash.svg',
+    logo: OFFICIAL_PAYMENT_LOGOS.gcash,
     category: 'digital_wallets',
     provider: 'swiftpay',
     region: 'Philippines',
@@ -175,7 +177,7 @@ export const PAYMENT_METHODS_CATALOG: PaymentMethodConfig[] = [
     id: 'asia_united',
     code: 'AUB',
     name: 'Asia United Bank',
-    logo: '/logos/aub.svg',
+    logo: OFFICIAL_PAYMENT_LOGOS.aub,
     category: 'banks',
     provider: 'swiftpay',
     region: 'Philippines',

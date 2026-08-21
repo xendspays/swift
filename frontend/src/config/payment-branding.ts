@@ -1,3 +1,5 @@
+import { OFFICIAL_PAYMENT_LOGOS as VERIFIED_PAYMENT_LOGOS } from './official-payment-logos';
+
 /**
  * Official Payment Method Logos & Branding
  * Uses official company logos and brand guidelines
@@ -7,7 +9,7 @@
 export const OFFICIAL_PAYMENT_LOGOS = {
   // ===== DIGITAL WALLETS (E-Wallets) =====
   'gcash': {
-    default: '/logos/gcash.svg',
+    default: VERIFIED_PAYMENT_LOGOS.gcash,
     official: true,
     brand_color: '#007DFF', // GCash official blue
     width: 100,
@@ -79,7 +81,7 @@ export const OFFICIAL_PAYMENT_LOGOS = {
     height: 40,
   },
   'aub': {
-    default: '/logos/asia-united-bank.svg',
+    default: VERIFIED_PAYMENT_LOGOS.aub,
     official: true,
     brand_color: '#C8102E', // AUB official red
     width: 100,

@@ -29,6 +29,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { SUPPORT_URL } from '@/lib/brand';
+import { OFFICIAL_PAYMENT_LOGOS } from '@/config/official-payment-logos';
 
 function useScrollReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
@@ -391,10 +392,10 @@ function HomePage() {
 
   const paymentChannels = [
     { name: 'Maya', logo: '/logos/maya.svg' },
-    { name: 'GCash', logo: '/logos/gcash.svg' },
+    { name: 'GCash', logo: OFFICIAL_PAYMENT_LOGOS.gcash },
     { name: 'BPI', logo: '/logos/bpi.png' },
     { name: 'BDO', logo: '/logos/bdo.png' },
-    { name: 'Landbank', logo: '/logos/landbank.png' },
+    { name: 'Landbank', logo: OFFICIAL_PAYMENT_LOGOS.landbank },
     { name: 'UnionBank', logo: '/logos/unionbank.png' },
     { name: 'Alipay', logo: '/logos/alipay.svg' },
     { name: 'WeChat Pay', logo: '/logos/wechat.svg' },
