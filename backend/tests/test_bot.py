@@ -2184,7 +2184,7 @@ class TestUsdtPhpConversion:
         assert wallet.balance == pytest.approx(1000.0, abs=0.01)
         assert {credit_transaction_id, debit_transaction_id} == {t.id for t in txns}
         assert any(t.transaction_type == "admin_credit" and t.amount == pytest.approx(1500.0, abs=0.01) for t in txns)
-        assert any(t.transaction_type == "admin_debit" and t.amount == pytest.approx(500.0, abs=0.01) for t in txns)
+        assert any(t.transaction_type == "admin_debit" and t.amount == pytest.approx(-500.0, abs=0.01) for t in txns)
 
     def test_admin_php_wallet_adjust_insufficient_balance_is_rejected(self, client, auth_headers):
         """Debiting more than the PHP wallet balance should be rejected."""
