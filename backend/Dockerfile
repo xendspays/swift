@@ -1,4 +1,5 @@
 # ── Stage 1: Build the React frontend ───────────────────────────────────────
+ARG PY_BASE_IMAGE=public.ecr.aws/docker/library/python:3.11-slim
 FROM cgr.dev/chainguard/node:latest-dev AS frontend-builder
 
 USER root
@@ -25,7 +26,7 @@ COPY frontend/ .
 RUN pnpm build
 
 # ── Stage 2: Python backend ──────────────────────────────────────────────────
-ARG PY_BASE_IMAGE=public.ecr.aws/docker/library/python:3.11-slim
+ARG PY_BASE_IMAGE
 FROM ${PY_BASE_IMAGE}
 
 WORKDIR /app/backend
@@ -58,5 +59,5 @@ ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
 ENV LOG_LEVEL=info
 
-# Start the server with migrations attempt first
-CMD ["sh", "-c", "timeout 35 python -m alembic upgrade head || echo 'Alembic migration timed out or failed, continuing...' ; exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --no-access-log"]
+# Require all schema migrations before the production server starts.
+CMD ["sh", "-c", "alembic upgrade heads && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info --no-access-log"]
