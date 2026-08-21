@@ -1,8 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import { Store, Landmark, KeyRound, Users } from 'lucide-react';
+import { Store, Landmark, KeyRound, Users, Globe2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 
 const ITEMS = [
+  {
+    title: 'Payment markets',
+    description: 'Country-specific QR, wallet, bank, and settlement settings.',
+    icon: Globe2,
+    href: '/settings/shop/payment-markets',
+  },
   {
     title: 'Store profile',
     description: 'Shop name, logo, platform settings, and multicurrency.',

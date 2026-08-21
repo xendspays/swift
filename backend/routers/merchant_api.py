@@ -24,6 +24,8 @@ class ApiConfigResponse(BaseModel):
     store_name: Optional[str] = None
     store_logo_url: Optional[str] = None
     permanent_link_slug: Optional[str] = None
+    payment_market: str
+    default_settlement_method: str
 
     test_access_key: str
     test_secret_key: Optional[str] = None
@@ -49,6 +51,8 @@ class ApiConfigUpdate(BaseModel):
     store_name: Optional[str] = None
     store_logo_url: Optional[str] = None
     permanent_link_slug: Optional[str] = None
+    payment_market: Optional[str] = None
+    default_settlement_method: Optional[str] = None
 
     test_callback_url: Optional[str] = None
     test_status_page_mode: Optional[str] = None
@@ -112,6 +116,13 @@ async def update_merchant_api_config(
 ):
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Organization membership required")
+
+    if payload.payment_market is not None and payload.payment_market not in {
+        "GB", "DE", "PT", "BG", "UA", "CN", "KR", "VN", "PH", "IN", "US", "EG", "SG"
+    }:
+        raise HTTPException(status_code=400, detail="Unsupported payment market")
+    if payload.default_settlement_method is not None and payload.default_settlement_method not in {"local_t0", "usdt_t0"}:
+        raise HTTPException(status_code=400, detail="Unsupported default settlement method")
 
     stmt = select(MerchantApiConfig).where(MerchantApiConfig.organization_id == current_user.organization_id)
     result = await db.execute(stmt)
