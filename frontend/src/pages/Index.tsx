@@ -222,7 +222,7 @@ function Navbar() {
         {/* Logo */}
         <Link to="/" className="flex-none" aria-label="SwiftPay — home">
           <img
-            src="https://swiftpay.ph/wp-content/themes/SwiftPay/site-assets/logos/swiftpay-logo-black.svg"
+            src="/logo.svg"
             alt="SwiftPay"
             height={30}
             className="h-[30px] w-auto"
